@@ -24,9 +24,6 @@ function normalizeStatePayload(payload) {
     ...payload,
     credentials: payload.credentials || [],
     proxies: payload.proxies || [],
-    proxy_provider_settings: payload.proxy_provider_settings || [],
-    proxy_pool_items: payload.proxy_pool_items || [],
-    proxy_groups: payload.proxy_groups || [],
     tasks: payload.tasks || [],
     schedules: payload.schedules || [],
     apiKeys: payload.apiKeys || payload.api_keys || [],
@@ -54,15 +51,6 @@ function SidebarIcon({ name }) {
       return (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M4 7h16v4H4zM6 13h12v4H6zM8 3h8v2H8zM10 18h4v3h-4z" />
-        </svg>
-      );
-    case 'proxy-pool':
-      return (
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M4 6h16M6 12h12M8 18h8" />
-          <circle cx="18" cy="6" r="2" />
-          <circle cx="6" cy="12" r="2" />
-          <circle cx="14" cy="18" r="2" />
         </svg>
       );
     case 'create-task':
@@ -311,37 +299,6 @@ Authorization: Bearer YOUR_API_KEY`,
 }
 
 export function ConsoleApp() {
-  const COUNTRY_PRESETS = [
-    ['US', tr('preset_country_us')],
-    ['SG', tr('preset_country_sg')],
-    ['JP', tr('preset_country_jp')],
-    ['GB', tr('preset_country_uk')],
-    ['AU', tr('preset_country_au')],
-    ['HK', tr('preset_country_hk')],
-  ];
-  const REGION_PRESETS = [
-    ['United States', tr('preset_region_us')],
-    ['Singapore', tr('preset_region_sg')],
-    ['Japan', tr('preset_region_jp')],
-    ['United Kingdom', tr('preset_region_uk')],
-    ['Australia', tr('preset_region_au')],
-    ['Hong Kong', tr('preset_region_hk')],
-  ];
-  const PROTOCOL_PRESETS = [
-    ['HTTPS', tr('preset_protocol_https')],
-    ['SOCKS4', tr('preset_protocol_socks4')],
-    ['SOCKS5', tr('preset_protocol_socks5')],
-  ];
-  const ANONYMITY_PRESETS = [
-    ['Elite', tr('preset_anonymity_elite')],
-    ['Anonymous', tr('preset_anonymity_anonymous')],
-    ['Transparent', tr('preset_anonymity_transparent')],
-  ];
-  const SORT_PRESETS = [
-    ['-speed', tr('preset_sort_speed_desc')],
-    ['-uptime', tr('preset_sort_uptime_desc')],
-    ['-last_checked', tr('preset_sort_checked_desc')],
-  ];
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === '1');
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -355,9 +312,6 @@ export function ConsoleApp() {
   const [statePayload, setStatePayload] = useState({
     credentials: [],
     proxies: [],
-    proxy_provider_settings: [],
-    proxy_pool_items: [],
-    proxy_groups: [],
     tasks: [],
     schedules: [],
     apiKeys: [],
@@ -369,7 +323,6 @@ export function ConsoleApp() {
     default_gptmail_credential_id: '',
     default_yescaptcha_credential_id: '',
     default_proxy_id: '',
-    default_proxy_provider_key: '',
   });
   const [credentialDraft, setCredentialDraft] = useState({
     name: '',
@@ -385,21 +338,6 @@ export function ConsoleApp() {
     proxy_url: '',
     notes: '',
   });
-  const [selectedProxyIds, setSelectedProxyIds] = useState([]);
-  const [selectedSavedProxyGroupId, setSelectedSavedProxyGroupId] = useState('');
-  const [providerDrafts, setProviderDrafts] = useState({});
-  const [proxyGroupDraft, setProxyGroupDraft] = useState({ name: '', notes: '' });
-  const [selectedPoolIds, setSelectedPoolIds] = useState([]);
-  const [selectedProxyGroupId, setSelectedProxyGroupId] = useState('');
-  const [proxyPoolTab, setProxyPoolTab] = useState('home');
-  const [proxyPoolFilters, setProxyPoolFilters] = useState({ keyword: '', protocol: '', country: '', source: '', workingOnly: false });
-  const [activeProxyGroupId, setActiveProxyGroupId] = useState(null);
-  const [groupOrderDraft, setGroupOrderDraft] = useState([]);
-  const [poolPage, setPoolPage] = useState(1);
-  const [poolPageSize, setPoolPageSize] = useState(20);
-  const [poolSortBy, setPoolSortBy] = useState('updated');
-  const [draggedMemberId, setDraggedMemberId] = useState(null);
-  const [dragOverMemberId, setDragOverMemberId] = useState(null);
   const [taskDraft, setTaskDraft] = useState(initialTaskDraft(APP_CONFIG.platforms || {}));
   const [scheduleDraft, setScheduleDraft] = useState({
     name: '',
@@ -407,9 +345,7 @@ export function ConsoleApp() {
     quantity: '1',
     concurrency: '1',
     time_of_day: '',
-    proxy_mode: 'none',
-    proxy_id: '',
-    proxy_group_id: '',
+    use_proxy: false,
   });
   const [apiKeyName, setApiKeyName] = useState('');
   const modalResolverRef = useRef(null);
@@ -422,8 +358,6 @@ export function ConsoleApp() {
     : statePayload.tasks.filter((task) => task.status === taskFilterStatus);
   const visibleTask = filteredTasks.find((item) => item.id === selectedTaskId) || filteredTasks[0] || null;
   const currentPlatformSpec = statePayload.platforms[taskDraft.platform] || {};
-  const activeProxyGroup = statePayload.proxy_groups.find((item) => item.id === activeProxyGroupId) || null;
-  const proxyPoolSummary = statePayload.proxy_pool_summary || {};
   const currentSectionLabel = tr(NAV_ITEMS.find(([sectionId]) => sectionId === activeSection)?.[1] || 'nav_dashboard');
   const logoutLabel = tr('nav_logout');
 
@@ -448,14 +382,6 @@ export function ConsoleApp() {
       setSelectedTaskId(visibleTask.id);
     }
   }, [visibleTask?.id]);
-
-  useEffect(() => {
-    if (!activeProxyGroup) {
-      setGroupOrderDraft([]);
-      return;
-    }
-    setGroupOrderDraft(activeProxyGroup.members || []);
-  }, [activeProxyGroupId, activeProxyGroup?.updated_at, activeProxyGroup?.count]);
 
   useEffect(() => {
     if (consoleRef.current) {
@@ -484,37 +410,11 @@ export function ConsoleApp() {
       default_gptmail_credential_id: payload.defaults.default_gptmail_credential_id ? String(payload.defaults.default_gptmail_credential_id) : '',
       default_yescaptcha_credential_id: payload.defaults.default_yescaptcha_credential_id ? String(payload.defaults.default_yescaptcha_credential_id) : '',
       default_proxy_id: payload.defaults.default_proxy_id ? String(payload.defaults.default_proxy_id) : '',
-      default_proxy_provider_key: payload.defaults.default_proxy_provider_key || '',
     });
-    setProviderDrafts(() => Object.fromEntries((payload.proxy_provider_settings || []).map((item) => [item.provider_key, {
-      provider_key: item.provider_key,
-      enabled: item.enabled !== false,
-      api_token: item.api_token || '',
-      auto_sync: item.config?.auto_sync === true,
-      country: item.config?.country || '',
-      region: item.config?.region || '',
-      protocol: item.config?.protocol || '',
-      anonymity: item.config?.anonymity || '',
-      min_speed: item.config?.min_speed ?? '',
-      min_uptime: item.config?.min_uptime ?? '',
-      is_working: item.config?.is_working !== false,
-      sort_by: item.config?.sort_by || '',
-      per_page: item.config?.per_page || 50,
-    }])));
-    setTaskDraft((current) => normalizeTaskDraft(initial ? initialTaskDraft(payload.platforms) : current, payload.platforms, payload.credentials, payload.proxies, payload.proxy_groups));
+    setTaskDraft((current) => normalizeTaskDraft(initial ? initialTaskDraft(payload.platforms) : current, payload.platforms, payload.credentials, payload.proxies));
     setScheduleDraft((current) => {
       const platform = payload.platforms[current.platform] ? current.platform : (getPlatformKeys(payload.platforms)[0] || 'openai-register');
-      const next = { ...current, platform };
-      if (!['none', 'default', 'custom', 'group', 'provider'].includes(next.proxy_mode)) {
-        next.proxy_mode = 'none';
-      }
-      if (!payload.proxies.some((item) => String(item.id) === String(next.proxy_id || ''))) {
-        next.proxy_id = '';
-      }
-      if (!payload.proxy_groups.some((item) => String(item.id) === String(next.proxy_group_id || ''))) {
-        next.proxy_group_id = '';
-      }
-      return next;
+      return { ...current, platform };
     });
     setSelectedTaskId((current) => {
       if (payload.tasks.some((item) => item.id === current)) {
@@ -582,7 +482,6 @@ export function ConsoleApp() {
           default_gptmail_credential_id: parseIntOrNull(defaultsDraft.default_gptmail_credential_id),
           default_yescaptcha_credential_id: parseIntOrNull(defaultsDraft.default_yescaptcha_credential_id),
           default_proxy_id: parseIntOrNull(defaultsDraft.default_proxy_id),
-          default_proxy_provider_key: defaultsDraft.default_proxy_provider_key || null,
         }),
       });
       await refreshState();
@@ -630,159 +529,6 @@ export function ConsoleApp() {
     });
   }
 
-  async function handleProviderSave(providerKey) {
-    const draft = providerDrafts[providerKey];
-    await withBusy(`provider-save-${providerKey}`, async () => {
-      await api('/api/proxy-providers', {
-        method: 'POST',
-        body: JSON.stringify({
-          ...draft,
-          min_speed: draft.min_speed === '' ? null : Number(draft.min_speed),
-          min_uptime: draft.min_uptime === '' ? null : Number(draft.min_uptime),
-          per_page: Number(draft.per_page || 50),
-          auto_sync: draft.auto_sync === true,
-          api_token: draft.api_token || null,
-          country: draft.country || null,
-          region: draft.region || null,
-          protocol: draft.protocol || null,
-          anonymity: draft.anonymity || null,
-          sort_by: draft.sort_by || null,
-        }),
-      });
-      await refreshState();
-    });
-  }
-
-  async function handleProviderSync(providerKey) {
-    await withBusy(`provider-sync-${providerKey}`, async () => {
-      const result = await api('/api/proxy-pool/sync', {
-        method: 'POST',
-        body: JSON.stringify({ provider_key: providerKey }),
-      });
-      await refreshState();
-      window.alert(tr('proxy_pool_sync_done', { count: result.imported || 0 }));
-    });
-  }
-
-  async function handlePruneInvalidPool() {
-    await withBusy('proxy-pool-prune', async () => {
-      await api('/api/proxy-pool/prune-invalid', { method: 'POST' });
-      await refreshState();
-    });
-  }
-
-  async function handleProxyGroupSubmit(event) {
-    event.preventDefault();
-    await withBusy('proxy-group-save', async () => {
-      await api('/api/proxy-groups', {
-        method: 'POST',
-        body: JSON.stringify({
-          ...proxyGroupDraft,
-          notes: proxyGroupDraft.notes || null,
-          pool_item_ids: selectedPoolIds.map((item) => Number(item)),
-        }),
-      });
-      setProxyGroupDraft({ name: '', notes: '' });
-      setSelectedPoolIds([]);
-      await refreshState();
-    });
-  }
-
-  async function handleAddSelectedToGroup() {
-    if (!selectedProxyGroupId || !selectedPoolIds.length) {
-      return;
-    }
-    await withBusy('proxy-group-assign', async () => {
-      await api('/api/proxy-groups/assign', {
-        method: 'POST',
-        body: JSON.stringify({
-          group_id: Number(selectedProxyGroupId),
-          pool_item_ids: selectedPoolIds.map((item) => Number(item)),
-        }),
-      });
-      setSelectedPoolIds([]);
-      await refreshState();
-    });
-  }
-
-  async function handleDeleteProxyGroup(item) {
-    if (!await confirmAction({
-      title: tr('delete'),
-      message: tr('delete_proxy_group_confirm', { name: item.name }),
-      confirmLabel: tr('delete'),
-    })) {
-      return;
-    }
-    await withBusy(`proxy-group-delete-${item.id}`, async () => {
-      await api(`/api/proxy-groups/${item.id}`, { method: 'DELETE' });
-      await refreshState();
-    });
-  }
-
-  async function handleDeleteProxyGroupMember(groupId, memberId) {
-    await withBusy(`proxy-group-member-delete-${memberId}`, async () => {
-      await api(`/api/proxy-groups/${groupId}/members/${memberId}`, { method: 'DELETE' });
-      await refreshState();
-    });
-  }
-
-  async function handleSaveGroupOrder(groupId) {
-    await withBusy(`proxy-group-order-${groupId}`, async () => {
-      await api(`/api/proxy-groups/${groupId}/reorder`, {
-        method: 'POST',
-        body: JSON.stringify({ member_ids: groupOrderDraft.map((item) => item.id) }),
-      });
-      await refreshState();
-    });
-  }
-
-  function moveGroupMember(memberId, direction) {
-    setGroupOrderDraft((current) => {
-      const index = current.findIndex((item) => item.id === memberId);
-      if (index < 0) {
-        return current;
-      }
-      const nextIndex = direction === 'up' ? index - 1 : index + 1;
-      if (nextIndex < 0 || nextIndex >= current.length) {
-        return current;
-      }
-      const next = [...current];
-      const [item] = next.splice(index, 1);
-      next.splice(nextIndex, 0, item);
-      return next;
-    });
-  }
-
-  function handleMemberDragStart(memberId) {
-    setDraggedMemberId(memberId);
-  }
-
-  function handleMemberDrop(targetMemberId) {
-    if (!draggedMemberId || draggedMemberId === targetMemberId) {
-      setDraggedMemberId(null);
-      return;
-    }
-    setGroupOrderDraft((current) => {
-      const fromIndex = current.findIndex((item) => item.id === draggedMemberId);
-      const toIndex = current.findIndex((item) => item.id === targetMemberId);
-      if (fromIndex < 0 || toIndex < 0) {
-        return current;
-      }
-      const next = [...current];
-      const [item] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, item);
-      return next;
-    });
-    setDraggedMemberId(null);
-    setDragOverMemberId(null);
-  }
-
-  function togglePoolSelection(poolItemId) {
-    setSelectedPoolIds((current) => (current.includes(poolItemId)
-      ? current.filter((item) => item !== poolItemId)
-      : [...current, poolItemId]));
-  }
-
   async function handleTaskSubmit(event) {
     event.preventDefault();
     await withBusy('task-save', async () => {
@@ -795,7 +541,6 @@ export function ConsoleApp() {
           email_credential_id: parseIntOrNull(taskDraft.email_credential_id),
           captcha_credential_id: parseIntOrNull(taskDraft.captcha_credential_id),
           proxy_id: taskDraft.proxy_mode === 'custom' ? parseIntOrNull(taskDraft.proxy_id) : null,
-          proxy_group_id: taskDraft.proxy_mode === 'group' ? parseIntOrNull(taskDraft.proxy_group_id) : null,
         }),
       });
       await refreshState();
@@ -821,8 +566,6 @@ export function ConsoleApp() {
           ...scheduleDraft,
           quantity: Number(scheduleDraft.quantity),
           concurrency: Number(scheduleDraft.concurrency || 1),
-          proxy_id: scheduleDraft.proxy_mode === 'custom' ? parseIntOrNull(scheduleDraft.proxy_id) : null,
-          proxy_group_id: scheduleDraft.proxy_mode === 'group' ? parseIntOrNull(scheduleDraft.proxy_group_id) : null,
           enabled: true,
         }),
       });
@@ -832,9 +575,7 @@ export function ConsoleApp() {
         quantity: '1',
         concurrency: '1',
         time_of_day: '',
-        proxy_mode: 'none',
-        proxy_id: '',
-        proxy_group_id: '',
+        use_proxy: false,
       });
       await refreshState();
     });
@@ -906,44 +647,6 @@ export function ConsoleApp() {
       await api(`/api/proxies/${item.id}`, { method: 'DELETE' });
       await refreshState();
     });
-  }
-
-  async function handleAddSavedProxiesToGroup() {
-    if (!selectedSavedProxyGroupId || !selectedProxyIds.length) {
-      return;
-    }
-    await withBusy('proxy-group-assign-saved', async () => {
-      await api('/api/proxy-groups/assign', {
-        method: 'POST',
-        body: JSON.stringify({
-          group_id: Number(selectedSavedProxyGroupId),
-          proxy_ids: selectedProxyIds.map((item) => Number(item)),
-        }),
-      });
-      setSelectedProxyIds([]);
-      await refreshState();
-    });
-  }
-
-  function toggleSavedProxySelection(proxyId) {
-    setSelectedProxyIds((current) => (current.includes(proxyId)
-      ? current.filter((item) => item !== proxyId)
-      : [...current, proxyId]));
-  }
-
-  function proxyModeLabel(mode) {
-    switch (mode) {
-      case 'default':
-        return tr('proxy_mode_default');
-      case 'custom':
-        return tr('proxy_mode_custom');
-      case 'group':
-        return tr('proxy_mode_group');
-      case 'provider':
-        return tr('proxy_mode_provider');
-      default:
-        return tr('proxy_mode_none');
-    }
   }
 
   async function handleStopTask(task) {
@@ -1226,25 +929,11 @@ export function ConsoleApp() {
                 <span>{tr('proxies_saved_desc')}</span>
               </div>
             </div>
-            <div className="stack panel-inline-tools">
-              <label className="field-card">
-                <span>{tr('field_proxy_group_select')}</span>
-                <select value={selectedSavedProxyGroupId} onChange={(event) => setSelectedSavedProxyGroupId(event.target.value)}>
-                  <option value="">{tr('choose_proxy_group')}</option>
-                  {statePayload.proxy_groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-              </label>
-              <div className="form-actions">
-                <BusyButton type="button" busy={isBusy('proxy-group-assign-saved')} onClick={handleAddSavedProxiesToGroup} disabled={!selectedSavedProxyGroupId || !selectedProxyIds.length}>{tr('add_selected_to_group')}</BusyButton>
-              </div>
-            </div>
             <div className="entity-list">
               {statePayload.proxies.length ? statePayload.proxies.map((item) => {
                 const isDefault = statePayload.defaults.default_proxy_id === item.id;
-                const selected = selectedProxyIds.includes(item.id);
                 return (
-                  <article className={`entity-card selectable-card ${selected ? 'is-selected' : ''}`.trim()} key={item.id}>
-                    <input type="checkbox" checked={selected} onChange={() => toggleSavedProxySelection(item.id)} />
+                  <article className="entity-card" key={item.id}>
                     <div>
                       <h3>{item.name}</h3>
                       <p className="meta">{item.proxy_url}{isDefault ? ` | ${tr('default_badge')}` : ''}</p>
@@ -1262,311 +951,6 @@ export function ConsoleApp() {
             </div>
           </article>
         </div>
-      </section>
-    );
-  }
-
-  function renderProxyPool() {
-    const providerItems = statePayload.proxy_provider_settings || [];
-    const protocolOptions = Array.from(new Set((statePayload.proxy_pool_items || []).map((item) => item.protocol).filter(Boolean))).sort();
-    const countryOptions = Array.from(new Set((statePayload.proxy_pool_items || []).map((item) => item.country_name || item.country_code).filter(Boolean))).sort();
-    const filteredPoolItems = (statePayload.proxy_pool_items || []).filter((item) => {
-      const keyword = proxyPoolFilters.keyword.trim().toLowerCase();
-      const matchesKeyword = !keyword || [item.proxy_url, item.country_name, item.country_code, item.source_label, item.protocol]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(keyword));
-      const matchesProtocol = !proxyPoolFilters.protocol || String(item.protocol || '').toLowerCase() === proxyPoolFilters.protocol.toLowerCase();
-      const matchesCountry = !proxyPoolFilters.country || String(item.country_code || item.country_name || '').toLowerCase().includes(proxyPoolFilters.country.toLowerCase());
-      const matchesSource = !proxyPoolFilters.source || String(item.source_label || item.provider_key || '').toLowerCase().includes(proxyPoolFilters.source.toLowerCase());
-      const matchesWorking = !proxyPoolFilters.workingOnly || Boolean(item.is_working);
-      return matchesKeyword && matchesProtocol && matchesCountry && matchesSource && matchesWorking;
-    });
-    const sortedPoolItems = [...filteredPoolItems].sort((a, b) => {
-      if (poolSortBy === 'speed') {
-        return Number(b.speed || -1) - Number(a.speed || -1);
-      }
-      if (poolSortBy === 'uptime') {
-        return Number(b.uptime || -1) - Number(a.uptime || -1);
-      }
-      return String(b.updated_at || '').localeCompare(String(a.updated_at || ''));
-    });
-    const totalPoolPages = Math.max(1, Math.ceil(sortedPoolItems.length / poolPageSize));
-    const safePoolPage = Math.min(poolPage, totalPoolPages);
-    const poolItems = sortedPoolItems.slice((safePoolPage - 1) * poolPageSize, safePoolPage * poolPageSize);
-    const currentPageIds = poolItems.map((item) => item.id);
-    const proxyGroups = statePayload.proxy_groups || [];
-    return (
-      <section className="section-card active">
-        <div className="section-head">
-          <div>
-            <p className="eyebrow">{tr('nav_proxy_pool')}</p>
-            <h2>{tr('proxy_pool_detail_title')}</h2>
-          </div>
-        </div>
-        <div className="subnav-tabs">
-          <button type="button" className={`subnav-tab ${proxyPoolTab === 'home' ? 'active' : ''}`.trim()} onClick={() => setProxyPoolTab('home')}>{'主页'}</button>
-          <button type="button" className={`subnav-tab ${proxyPoolTab === 'pool' ? 'active' : ''}`.trim()} onClick={() => setProxyPoolTab('pool')}>{tr('proxy_pool_list_title')}</button>
-          <button type="button" className={`subnav-tab ${proxyPoolTab === 'groups' ? 'active' : ''}`.trim()} onClick={() => setProxyPoolTab('groups')}>{tr('proxy_groups_title')}</button>
-          <button type="button" className={`subnav-tab ${proxyPoolTab === 'providers' ? 'active' : ''}`.trim()} onClick={() => setProxyPoolTab('providers')}>{tr('proxy_pool_provider_title')}</button>
-        </div>
-        {proxyPoolTab === 'home' ? (
-          <div className="grid-two">
-            <article className="panel">
-              <div className="panel-head"><div><h3>{'当前可用代理数'}</h3><span>{'代理池总览'}</span></div></div>
-              <div className="metric-grid">
-                <article className="metric-card"><strong>{proxyPoolSummary.available_count || 0}</strong><span>{'可用代理'}</span></article>
-                <article className="metric-card"><strong>{proxyPoolSummary.invalid_count || 0}</strong><span>{'不可用代理'}</span></article>
-              </div>
-            </article>
-            <article className="panel">
-              <div className="panel-head"><div><h3>{'默认代理来源'}</h3><span>{'默认与自动更新控制'}</span></div></div>
-              <form className="stack" onSubmit={handleDefaultsSubmit}>
-                <label className="field-card">
-                  <span>{'默认代理来源'}</span>
-                  <select value={defaultsDraft.default_proxy_provider_key} onChange={(event) => setDefaultsDraft((current) => ({ ...current, default_proxy_provider_key: event.target.value }))}>
-                    <option value="">{'默认手动代理'}</option>
-                    <option value="proxy-free.com">{'Proxy-Free API'}</option>
-                  </select>
-                </label>
-                <label className="field-card">
-                  <span>{tr('default_proxy')}</span>
-                  <select value={defaultsDraft.default_proxy_id} onChange={(event) => setDefaultsDraft((current) => ({ ...current, default_proxy_id: event.target.value }))}>
-                    <option value="">{tr('no_default_proxy')}</option>
-                    {statePayload.proxies.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                </label>
-                <p className="field-tip field-tip--soft">{`自动更新状态：${proxyPoolSummary.auto_sync_enabled ? '已启用' : '未启用'}`}</p>
-                <div className="form-actions">
-                  <BusyButton type="submit" busy={isBusy('defaults-save')}>{tr('save_defaults')}</BusyButton>
-                  <BusyButton type="button" busy={isBusy('proxy-pool-prune')} onClick={handlePruneInvalidPool}>{'一键剔除不可用代理'}</BusyButton>
-                </div>
-              </form>
-            </article>
-          </div>
-        ) : null}
-        {proxyPoolTab === 'providers' ? (
-          <div className="grid-two">
-            {providerItems.map((item) => {
-              const draft = providerDrafts[item.provider_key] || {};
-              return (
-                <article className="panel" key={item.provider_key}>
-                  <div className="panel-head">
-                    <div>
-                      <h3>{item.provider_label}</h3>
-                      <span>{tr('proxy_pool_provider_desc')}</span>
-                    </div>
-                    <span className="status-pill">{item.is_configured ? tr('provider_status_ready') : tr('provider_status_empty')}</span>
-                  </div>
-                  <div className="stack">
-                    <label className="field-card field-card--checkbox">
-                      <input type="checkbox" checked={draft.enabled !== false} onChange={(event) => setProviderDrafts((current) => ({ ...current, [item.provider_key]: { ...draft, enabled: event.target.checked } }))} />
-                      <span>{tr('enable')}</span>
-                    </label>
-                    <label className="field-card field-card--checkbox">
-                      <input type="checkbox" checked={draft.auto_sync === true} onChange={(event) => setProviderDrafts((current) => ({ ...current, [item.provider_key]: { ...draft, auto_sync: event.target.checked } }))} />
-                      <span>{'自动更新'}</span>
-                    </label>
-                    {item.provider_key === 'proxy-free.com' ? (
-                      <>
-                        <p className="field-tip field-tip--soft">{tr('provider_proxyfree_hint')}</p>
-                        <label className="field-card">
-                          <span>{tr('field_provider_token')}</span>
-                          <input value={draft.api_token || ''} onChange={(event) => setProviderDrafts((current) => ({ ...current, [item.provider_key]: { ...draft, api_token: event.target.value } }))} />
-                        </label>
-                      </>
-                    ) : (
-                      <p className="field-tip field-tip--soft">{tr('provider_openproxylist_hint')}</p>
-                    )}
-                    <div className="grid-two compact-grid">
-                      <label className="field-card"><span>{tr('field_country')}</span><select value={draft.country || ''} onChange={(event) => setProviderDrafts((current) => ({ ...current, [item.provider_key]: { ...draft, country: event.target.value } }))}><option value="">All</option>{COUNTRY_PRESETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-                      <label className="field-card"><span>{tr('field_region')}</span><select value={draft.region || ''} onChange={(event) => setProviderDrafts((current) => ({ ...current, [item.provider_key]: { ...draft, region: event.target.value } }))}><option value="">All</option>{REGION_PRESETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-                      <label className="field-card"><span>{tr('field_protocol')}</span><select value={draft.protocol || ''} onChange={(event) => setProviderDrafts((current) => ({ ...current, [item.provider_key]: { ...draft, protocol: event.target.value } }))}><option value="">All</option>{PROTOCOL_PRESETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-                      <label className="field-card"><span>{tr('field_anonymity')}</span><select value={draft.anonymity || ''} onChange={(event) => setProviderDrafts((current) => ({ ...current, [item.provider_key]: { ...draft, anonymity: event.target.value } }))}><option value="">All</option>{ANONYMITY_PRESETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-                      <label className="field-card"><span>{tr('field_min_speed')}</span><input type="number" value={draft.min_speed ?? ''} onChange={(event) => setProviderDrafts((current) => ({ ...current, [item.provider_key]: { ...draft, min_speed: event.target.value } }))} /></label>
-                      <label className="field-card"><span>{tr('field_min_uptime')}</span><input type="number" value={draft.min_uptime ?? ''} onChange={(event) => setProviderDrafts((current) => ({ ...current, [item.provider_key]: { ...draft, min_uptime: event.target.value } }))} /></label>
-                      <label className="field-card"><span>{tr('field_sort_by')}</span><select value={draft.sort_by || ''} onChange={(event) => setProviderDrafts((current) => ({ ...current, [item.provider_key]: { ...draft, sort_by: event.target.value } }))}><option value="">Default</option>{SORT_PRESETS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-                      <label className="field-card"><span>Per Page</span><input type="number" min="1" max="100" value={draft.per_page || 50} onChange={(event) => setProviderDrafts((current) => ({ ...current, [item.provider_key]: { ...draft, per_page: event.target.value } }))} /></label>
-                    </div>
-                    <p className="field-tip field-tip--soft">{'固定地区限制：当前仅允许使用已选择国家/区域的代理进入代理池与代理组。'}</p>
-                    <label className="field-card field-card--checkbox">
-                      <input type="checkbox" checked={draft.is_working !== false} onChange={(event) => setProviderDrafts((current) => ({ ...current, [item.provider_key]: { ...draft, is_working: event.target.checked } }))} />
-                      <span>{tr('field_is_working')}</span>
-                    </label>
-                    <div className="entity-actions">
-                      <BusyButton type="button" busy={isBusy(`provider-save-${item.provider_key}`)} onClick={() => handleProviderSave(item.provider_key)}>{tr('save_provider_settings')}</BusyButton>
-                      <BusyButton type="button" busy={isBusy(`provider-sync-${item.provider_key}`)} onClick={() => handleProviderSync(item.provider_key)}>{tr('sync_proxy_pool')}</BusyButton>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        ) : null}
-        {proxyPoolTab === 'pool' ? (
-          <div className="grid-two">
-            <article className="panel">
-              <div className="panel-head">
-                <div>
-                  <h3>{tr('proxy_pool_list_title')}</h3>
-                  <span>{tr('proxy_pool_list_desc')}</span>
-                </div>
-              </div>
-              <div className="grid-two compact-grid panel-inline-tools">
-                <label className="field-card"><span>{tr('proxy_pool_filter_keyword')}</span><input value={proxyPoolFilters.keyword} onChange={(event) => setProxyPoolFilters((current) => ({ ...current, keyword: event.target.value }))} /></label>
-                <label className="field-card"><span>{tr('proxy_pool_filter_protocol')}</span><select value={proxyPoolFilters.protocol} onChange={(event) => setProxyPoolFilters((current) => ({ ...current, protocol: event.target.value }))}><option value="">All</option>{protocolOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-                <label className="field-card"><span>{tr('proxy_pool_filter_country')}</span><select value={proxyPoolFilters.country} onChange={(event) => setProxyPoolFilters((current) => ({ ...current, country: event.target.value }))}><option value="">All</option>{countryOptions.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-                <label className="field-card"><span>{tr('proxy_pool_filter_source')}</span><input value={proxyPoolFilters.source} onChange={(event) => setProxyPoolFilters((current) => ({ ...current, source: event.target.value }))} /></label>
-                <label className="field-card field-card--checkbox"><input type="checkbox" checked={proxyPoolFilters.workingOnly} onChange={(event) => setProxyPoolFilters((current) => ({ ...current, workingOnly: event.target.checked }))} /><span>{tr('proxy_pool_filter_working')}</span></label>
-                <label className="field-card"><span>Sort</span><select value={poolSortBy} onChange={(event) => setPoolSortBy(event.target.value)}><option value="updated">Updated</option><option value="speed">Speed</option><option value="uptime">Uptime</option></select></label>
-                <label className="field-card"><span>Page Size</span><select value={poolPageSize} onChange={(event) => { setPoolPageSize(Number(event.target.value)); setPoolPage(1); }}><option value="20">20</option><option value="50">50</option><option value="100">100</option></select></label>
-              </div>
-              <div className="form-actions panel-inline-tools">
-                <button type="button" onClick={() => setSelectedPoolIds((current) => Array.from(new Set([...current, ...currentPageIds])))}>{'全选当前页'}</button>
-                <button type="button" onClick={() => setSelectedPoolIds((current) => current.filter((id) => !currentPageIds.includes(id)))}>{'反选当前页'}</button>
-                <button type="button" onClick={() => setSelectedPoolIds([])}>{'清空选择'}</button>
-              </div>
-              <div className="entity-list pool-list">
-                {poolItems.length ? poolItems.map((item) => {
-                  const selected = selectedPoolIds.includes(item.id);
-                  return (
-                    <label className={`entity-card selectable-card ${selected ? 'is-selected' : ''}`.trim()} key={item.id}>
-                      <input type="checkbox" checked={selected} onChange={() => togglePoolSelection(item.id)} />
-                      <div>
-                        <h3>{item.proxy_url}</h3>
-                        <p className="meta">{tr('pool_item_meta', { source: item.source_label || item.provider_key, protocol: item.protocol || '-', country: item.country_name || item.country_code || '-', status: item.is_working ? 'OK' : 'N/A' })}</p>
-                        <div className="detail-chips">
-                          <span className="detail-chip">{tr('proxy_pool_protocol')}: {item.protocol || '-'}</span>
-                          <span className="detail-chip">{tr('proxy_pool_country')}: {item.country_name || item.country_code || '-'}</span>
-                          <span className="detail-chip">{tr('proxy_pool_source')}: {item.source_label || item.provider_key}</span>
-                          <span className="detail-chip">{tr('proxy_pool_speed')}: {item.speed ?? '-'}</span>
-                          <span className="detail-chip">{tr('proxy_pool_uptime')}: {item.uptime ?? '-'}</span>
-                        </div>
-                      </div>
-                    </label>
-                  );
-                }) : <p className="empty">{tr('empty_proxy_pool')}</p>}
-              </div>
-              <div className="form-actions pagination-bar">
-                <button type="button" disabled={safePoolPage <= 1} onClick={() => setPoolPage((current) => Math.max(1, current - 1))}>Prev</button>
-                <span className="meta">{safePoolPage} / {totalPoolPages}</span>
-                <button type="button" disabled={safePoolPage >= totalPoolPages} onClick={() => setPoolPage((current) => Math.min(totalPoolPages, current + 1))}>Next</button>
-              </div>
-            </article>
-            <article className="panel">
-              <div className="panel-head">
-                <div>
-                  <h3>{tr('proxy_groups_title')}</h3>
-                  <span>{tr('proxy_groups_desc')}</span>
-                </div>
-              </div>
-              <label className="field-card">
-                <span>{tr('field_proxy_group_select')}</span>
-                <select value={selectedProxyGroupId} onChange={(event) => setSelectedProxyGroupId(event.target.value)}>
-                  <option value="">{tr('choose_proxy_group')}</option>
-                  {proxyGroups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                </select>
-              </label>
-              <div className="form-actions">
-                <BusyButton type="button" busy={isBusy('proxy-group-assign')} onClick={handleAddSelectedToGroup} disabled={!selectedProxyGroupId || !selectedPoolIds.length}>{tr('add_selected_to_group')}</BusyButton>
-              </div>
-            </article>
-          </div>
-        ) : null}
-        {proxyPoolTab === 'groups' ? (
-          <div className="grid-two">
-            <article className="panel">
-              <div className="panel-head">
-                <div>
-                  <h3>{tr('save_proxy_group')}</h3>
-                  <span>{tr('proxy_groups_desc')}</span>
-                </div>
-              </div>
-              <form className="stack" onSubmit={handleProxyGroupSubmit}>
-                <label className="field-card">
-                  <span>{tr('field_proxy_group_name')}</span>
-                  <input required value={proxyGroupDraft.name} onChange={(event) => setProxyGroupDraft((current) => ({ ...current, name: event.target.value }))} />
-                </label>
-                <label className="field-card">
-                  <span>{tr('field_notes')}</span>
-                  <textarea rows="3" value={proxyGroupDraft.notes} onChange={(event) => setProxyGroupDraft((current) => ({ ...current, notes: event.target.value }))} />
-                </label>
-                <p className="field-tip field-tip--soft">{tr('proxy_group_mode_hint')}</p>
-                <BusyButton type="submit" busy={isBusy('proxy-group-save')}>{tr('save_proxy_group')}</BusyButton>
-              </form>
-            </article>
-            <article className="panel">
-              <div className="panel-head">
-                <div>
-                  <h3>{tr('proxy_groups_title')}</h3>
-                  <span>{tr('proxy_groups_desc')}</span>
-                </div>
-              </div>
-              <div className="entity-list">
-                {proxyGroups.length ? proxyGroups.map((item) => (
-                  <article className="entity-card" key={item.id}>
-                    <div>
-                      <h3>{item.name}</h3>
-                      <p className="meta">{tr('proxy_group_meta', { count: item.count || 0, created_at: item.created_at })}</p>
-                      <p className="notes">{item.notes || ''}</p>
-                    </div>
-                    <div className="entity-actions">
-                      <BusyButton type="button" busy={false} onClick={() => setActiveProxyGroupId(item.id)}>{tr('proxy_group_detail_title')}</BusyButton>
-                      <BusyButton type="button" className="danger" busy={isBusy(`proxy-group-delete-${item.id}`)} onClick={() => handleDeleteProxyGroup(item)}>{tr('delete')}</BusyButton>
-                    </div>
-                  </article>
-                )) : <p className="empty">{tr('empty_proxy_groups')}</p>}
-              </div>
-            </article>
-            <article className="panel">
-              <div className="panel-head">
-                <div>
-                  <h3>{tr('proxy_group_detail_title')}</h3>
-                  <span>{tr('proxy_group_detail_desc')}</span>
-                </div>
-              </div>
-              {activeProxyGroup ? (
-                <div className="stack">
-                  <div>
-                    <h3>{activeProxyGroup.name}</h3>
-                    <p className="meta">{tr('proxy_group_meta', { count: activeProxyGroup.count || 0, created_at: activeProxyGroup.created_at })}</p>
-                  </div>
-                  <div className="entity-list">
-                    {groupOrderDraft.length ? groupOrderDraft.map((member, index) => (
-                      <article
-                        className={`entity-card draggable-card ${draggedMemberId === member.id ? 'is-dragging' : ''} ${dragOverMemberId === member.id ? 'is-drop-target' : ''}`.trim()}
-                        key={member.id}
-                        draggable
-                        onDragStart={() => handleMemberDragStart(member.id)}
-                        onDragOver={(event) => { event.preventDefault(); setDragOverMemberId(member.id); }}
-                        onDrop={() => handleMemberDrop(member.id)}
-                        onDragEnd={() => { setDraggedMemberId(null); setDragOverMemberId(null); }}
-                      >
-                        <div>
-                          <h3>{member.proxy_url}</h3>
-                          <p className="meta">{tr('group_member_meta', { source: member.source_type, label: member.label || member.proxy_url })}</p>
-                          <div className="detail-chips">
-                            <span className="detail-chip">{tr('proxy_pool_source')}: {member.pool_source_label || member.source_type}</span>
-                            <span className="detail-chip">{tr('proxy_pool_protocol')}: {member.pool_protocol || '-'}</span>
-                            <span className="detail-chip">{tr('proxy_pool_country')}: {member.pool_country_name || member.pool_country_code || '-'}</span>
-                            <span className="detail-chip">{tr('proxy_pool_speed')}: {member.pool_speed ?? '-'}</span>
-                            <span className="detail-chip">{tr('proxy_pool_uptime')}: {member.pool_uptime ?? '-'}</span>
-                          </div>
-                        </div>
-                        <div className="entity-actions">
-                          <span className="drag-handle">::</span>
-                          <BusyButton type="button" className="danger" busy={isBusy(`proxy-group-member-delete-${member.id}`)} onClick={() => handleDeleteProxyGroupMember(activeProxyGroup.id, member.id)}>{tr('remove_group_member')}</BusyButton>
-                        </div>
-                      </article>
-                    )) : <p className="empty">{tr('empty_group_members')}</p>}
-                  </div>
-                  <div className="form-actions">
-                    <BusyButton type="button" busy={isBusy(`proxy-group-order-${activeProxyGroup.id}`)} onClick={() => handleSaveGroupOrder(activeProxyGroup.id)} disabled={!groupOrderDraft.length}>{tr('save_group_order')}</BusyButton>
-                  </div>
-                </div>
-              ) : <p className="empty">{tr('empty_proxy_groups')}</p>}
-            </article>
-          </div>
-        ) : null}
       </section>
     );
   }
@@ -1597,7 +981,7 @@ export function ConsoleApp() {
                     ...current,
                     platform: nextPlatform,
                     concurrency: String(nextSpec.default_concurrency || current.concurrency || 1),
-                  }, statePayload.platforms, statePayload.credentials, statePayload.proxies, statePayload.proxy_groups));
+                  }, statePayload.platforms, statePayload.credentials, statePayload.proxies));
                 }}
               >
                 {Object.entries(statePayload.platforms).map(([key, item]) => <option key={key} value={key}>{item.label}</option>)}
@@ -1630,20 +1014,18 @@ export function ConsoleApp() {
               </label>
             ) : null}
             <label className="field-card">
-                <span>{tr('field_proxy_mode')}</span>
-                <select
-                  value={taskDraft.proxy_mode}
-                  onChange={(event) => setTaskDraft((current) => normalizeTaskDraft({ ...current, proxy_mode: event.target.value }, statePayload.platforms, statePayload.credentials, statePayload.proxies, statePayload.proxy_groups))}
-                  disabled={!currentPlatformSpec.supports_proxy}
-                >
-                  <option value="none">{tr('proxy_mode_none')}</option>
-                  <option value="default">{tr('proxy_mode_default')}</option>
-                  <option value="custom">{tr('proxy_mode_custom')}</option>
-                  <option value="group">{tr('proxy_mode_group')}</option>
-                  <option value="provider">{tr('proxy_mode_provider')}</option>
-                </select>
-              </label>
-              {currentPlatformSpec.supports_proxy && taskDraft.proxy_mode === 'custom' ? (
+              <span>{tr('field_proxy_mode')}</span>
+              <select
+                value={taskDraft.proxy_mode}
+                onChange={(event) => setTaskDraft((current) => normalizeTaskDraft({ ...current, proxy_mode: event.target.value }, statePayload.platforms, statePayload.credentials, statePayload.proxies))}
+                disabled={!currentPlatformSpec.supports_proxy}
+              >
+                <option value="none">{tr('proxy_mode_none')}</option>
+                <option value="default">{tr('proxy_mode_default')}</option>
+                <option value="custom">{tr('proxy_mode_custom')}</option>
+              </select>
+            </label>
+            {currentPlatformSpec.supports_proxy && taskDraft.proxy_mode === 'custom' ? (
               <label className="field-card">
                 <span>{tr('field_proxy_select')}</span>
                 <select value={taskDraft.proxy_id} onChange={(event) => setTaskDraft((current) => ({ ...current, proxy_id: event.target.value }))}>
@@ -1652,19 +1034,6 @@ export function ConsoleApp() {
                 </select>
               </label>
             ) : null}
-            {currentPlatformSpec.supports_proxy && taskDraft.proxy_mode === 'group' ? (
-              <>
-                <label className="field-card">
-                  <span>{tr('field_proxy_group_select')}</span>
-                  <select value={taskDraft.proxy_group_id} onChange={(event) => setTaskDraft((current) => ({ ...current, proxy_group_id: event.target.value }))}>
-                    <option value="">{tr('choose_proxy_group')}</option>
-                    {statePayload.proxy_groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                </label>
-                <p className="field-tip field-tip--soft full-row">{tr('proxy_group_mode_hint')}</p>
-              </>
-            ) : null}
-            {currentPlatformSpec.supports_proxy && taskDraft.proxy_mode === 'provider' ? <p className="field-tip field-tip--soft full-row">{tr('proxy_provider_mode_hint')}</p> : null}
             <div className="form-actions full-row">
               <BusyButton type="submit" busy={isBusy('task-save')}>{tr('save_task')}</BusyButton>
             </div>
@@ -1795,34 +1164,10 @@ export function ConsoleApp() {
                 <span>{tr('field_time_of_day')}</span>
                 <input type="time" required value={scheduleDraft.time_of_day} onChange={(event) => setScheduleDraft((current) => ({ ...current, time_of_day: event.target.value }))} />
               </label>
-              <label className="field-card">
-                <span>{tr('field_proxy_mode')}</span>
-                <select value={scheduleDraft.proxy_mode} onChange={(event) => setScheduleDraft((current) => ({ ...current, proxy_mode: event.target.value }))}>
-                  <option value="none">{tr('proxy_mode_none')}</option>
-                  <option value="default">{tr('proxy_mode_default')}</option>
-                  <option value="custom">{tr('proxy_mode_custom')}</option>
-                  <option value="group">{tr('proxy_mode_group')}</option>
-                  <option value="provider">{tr('proxy_mode_provider')}</option>
-                </select>
+              <label className="checkbox-row field-card field-card--checkbox">
+                <input type="checkbox" checked={scheduleDraft.use_proxy} onChange={(event) => setScheduleDraft((current) => ({ ...current, use_proxy: event.target.checked }))} />
+                <span>{tr('field_use_default_proxy')}</span>
               </label>
-              {scheduleDraft.proxy_mode === 'custom' ? (
-                <label className="field-card">
-                  <span>{tr('field_proxy_select')}</span>
-                  <select value={scheduleDraft.proxy_id} onChange={(event) => setScheduleDraft((current) => ({ ...current, proxy_id: event.target.value }))}>
-                    <option value="">{tr('choose_proxy')}</option>
-                    {statePayload.proxies.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                </label>
-              ) : null}
-              {scheduleDraft.proxy_mode === 'group' ? (
-                <label className="field-card">
-                  <span>{tr('field_proxy_group_select')}</span>
-                  <select value={scheduleDraft.proxy_group_id} onChange={(event) => setScheduleDraft((current) => ({ ...current, proxy_group_id: event.target.value }))}>
-                    <option value="">{tr('choose_proxy_group')}</option>
-                    {statePayload.proxy_groups.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                </label>
-              ) : null}
               <BusyButton type="submit" busy={isBusy('schedule-save')}>{tr('save_schedule')}</BusyButton>
             </form>
           </article>
@@ -1844,7 +1189,7 @@ export function ConsoleApp() {
                       quantity: item.quantity,
                       enabled: item.enabled ? tr('enable') : tr('disable'),
                     })}</p>
-                    <p className="notes">{proxyModeLabel(item.proxy_mode)}</p>
+                    <p className="notes">{item.use_proxy ? tr('schedule_proxy_on') : tr('schedule_proxy_off')}</p>
                   </div>
                   <div className="entity-actions">
                     <BusyButton type="button" busy={isBusy(`schedule-toggle-${item.id}`)} onClick={() => handleToggleSchedule(item)}>{item.enabled ? tr('disable') : tr('enable')}</BusyButton>
@@ -2194,8 +1539,6 @@ Authorization: Bearer YOUR_API_KEY`,
         return renderCredentials();
       case 'proxies':
         return renderProxies();
-      case 'proxy-pool':
-        return renderProxyPool();
       case 'create-task':
         return renderCreateTask();
       case 'task-detail':
