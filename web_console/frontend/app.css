@@ -368,6 +368,87 @@ button, input, select, textarea { font: inherit; }
 .panel.compact { padding: 20px; }
 .panel-head { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .panel-head--stack { display: block; }
+.subnav-tabs { display: flex; gap: 10px; flex-wrap: wrap; }
+.subnav-tab {
+  border: 1px solid rgba(216, 205, 180, 0.9);
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 10px 16px;
+}
+.subnav-tab.active {
+  background: rgba(216, 183, 141, 0.2);
+  border-color: rgba(216, 183, 141, 0.6);
+}
+.compact-grid { gap: 12px; }
+.pool-list { max-height: 760px; overflow: auto; }
+.panel-inline-tools { margin-bottom: 16px; }
+.selectable-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+}
+.selectable-card.is-selected {
+  border-color: rgba(216, 183, 141, 0.6);
+  background: rgba(255, 251, 245, 0.98);
+}
+.selectable-card input {
+  width: 18px;
+  height: 18px;
+  margin-top: 4px;
+}
+.detail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.detail-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 250, 242, 0.92);
+  border: 1px solid rgba(216, 205, 180, 0.9);
+  color: var(--muted);
+  font-size: 12px;
+}
+.pagination-bar { justify-content: flex-start; align-items: center; }
+.draggable-card {
+  cursor: grab;
+  position: relative;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+.draggable-card.is-dragging {
+  opacity: 0.55;
+  transform: scale(0.985);
+}
+.draggable-card.is-drop-target {
+  border-color: rgba(216, 183, 141, 0.72);
+  background: rgba(255, 252, 246, 0.98);
+  box-shadow: 0 18px 34px rgba(216, 183, 141, 0.14);
+}
+.draggable-card.is-drop-target::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: -2px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(216, 183, 141, 0.92);
+}
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  color: var(--muted);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
 
 .simple-row, .task-side-item {
   width: 100%;

@@ -5,6 +5,7 @@ export const NAV_ITEMS = [
   ['dashboard', 'nav_dashboard'],
   ['credentials', 'nav_credentials'],
   ['proxies', 'nav_proxies'],
+  ['proxy-pool', 'nav_proxy_pool'],
   ['create-task', 'nav_create_task'],
   ['task-detail', 'nav_task_detail'],
   ['schedules', 'nav_schedules'],
@@ -72,16 +73,18 @@ export function initialTaskDraft(platforms) {
     captcha_credential_id: '',
     proxy_mode: 'none',
     proxy_id: '',
+    proxy_group_id: '',
   };
 }
 
-export function normalizeTaskDraft(draft, platforms, credentials, proxies) {
+export function normalizeTaskDraft(draft, platforms, credentials, proxies, proxyGroups = []) {
   const keys = getPlatformKeys(platforms);
   const platform = platforms[draft.platform] ? draft.platform : (keys[0] || 'openai-register');
   const spec = platforms[platform] || {};
   const mailIds = new Set(credentials.filter((item) => item.kind === 'gptmail').map((item) => String(item.id)));
   const captchaIds = new Set(credentials.filter((item) => item.kind === 'yescaptcha').map((item) => String(item.id)));
   const proxyIds = new Set(proxies.map((item) => String(item.id)));
+  const proxyGroupIds = new Set(proxyGroups.map((item) => String(item.id)));
   const next = {
     ...draft,
     platform,
@@ -103,14 +106,20 @@ export function normalizeTaskDraft(draft, platforms, credentials, proxies) {
   if (!spec.supports_proxy) {
     next.proxy_mode = 'none';
     next.proxy_id = '';
+    next.proxy_group_id = '';
   } else {
-    if (!['none', 'default', 'custom'].includes(next.proxy_mode)) {
+    if (!['none', 'default', 'custom', 'group', 'provider'].includes(next.proxy_mode)) {
       next.proxy_mode = 'none';
     }
     if (next.proxy_mode !== 'custom') {
       next.proxy_id = '';
     } else if (!proxyIds.has(String(next.proxy_id || ''))) {
       next.proxy_id = '';
+    }
+    if (next.proxy_mode !== 'group') {
+      next.proxy_group_id = '';
+    } else if (!proxyGroupIds.has(String(next.proxy_group_id || ''))) {
+      next.proxy_group_id = '';
     }
   }
 

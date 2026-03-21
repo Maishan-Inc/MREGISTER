@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import requests
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -34,6 +35,11 @@ SESSION_COOKIE = "register_console_session"
 SESSION_TTL_HOURS = max(1, int(os.getenv("WEB_CONSOLE_SESSION_TTL_HOURS", "24")))
 MAX_CONCURRENT_TASKS = max(1, int(os.getenv("WEB_CONSOLE_MAX_CONCURRENT_TASKS", "2")))
 POLL_INTERVAL_SECONDS = max(1.0, float(os.getenv("WEB_CONSOLE_POLL_INTERVAL", "2.0")))
+
+PROXY_PROVIDER_KEYS = {
+    "proxy-free.com": "Proxy-Free Premium API",
+    "openproxylist.com": "OpenProxyList",
+}
 
 PLATFORMS = {
     "openai-register": {
@@ -79,6 +85,7 @@ UI_TRANSLATIONS = {
         "nav_dashboard": "首页",
         "nav_credentials": "凭据",
         "nav_proxies": "代理",
+        "nav_proxy_pool": "代理池",
         "nav_create_task": "新建任务",
         "nav_task_detail": "任务详情",
         "nav_schedules": "定时任务",
@@ -115,10 +122,65 @@ UI_TRANSLATIONS = {
         "field_notes": "备注",
         "save_credential": "保存凭据",
         "section_proxies": "代理管理",
+        "section_proxy_pool": "代理池",
         "proxies_create_title": "新增代理",
         "proxies_create_desc": "支持保存多个代理，并可指定为站点默认代理。",
         "proxies_saved_title": "已保存代理",
         "proxies_saved_desc": "任务可选择默认代理、指定代理或不使用代理。",
+        "proxies_group_assign_title": "加入代理组",
+        "proxies_group_assign_desc": "可从手动代理中多选后批量加入已有代理组。",
+        "proxy_groups_title": "代理组",
+        "proxy_groups_desc": "将多个代理组合在一起，任务可按轮询模式自动切换。",
+        "proxy_pool_provider_title": "供应商设置",
+        "proxy_pool_provider_desc": "在这里配置站点 Token 与筛选条件，再同步代理池数据。",
+        "proxy_pool_list_title": "代理池列表",
+        "proxy_pool_list_desc": "支持多选代理并批量加入代理组。",
+        "field_provider_token": "API Token",
+        "field_proxy_group_select": "选择代理组",
+        "field_proxy_group_name": "代理组名称",
+        "field_protocol": "协议类型",
+        "field_country": "国家",
+        "field_region": "区域/搜索",
+        "field_anonymity": "匿名级别",
+        "field_min_speed": "最低速度",
+        "field_min_uptime": "最低在线率",
+        "field_sort_by": "排序字段",
+        "field_is_working": "仅同步可用代理",
+        "proxy_mode_group": "代理组轮询",
+        "proxy_mode_provider": "Proxy-Free API",
+        "save_proxy_group": "保存代理组",
+        "save_provider_settings": "保存供应商设置",
+        "sync_proxy_pool": "同步代理池",
+        "add_selected_to_group": "选中加入代理组",
+        "choose_proxy_group": "选择一个代理组",
+        "empty_proxy_groups": "暂无代理组",
+        "empty_proxy_pool": "代理池暂无数据",
+        "provider_status_ready": "已配置",
+        "provider_status_empty": "未配置",
+        "proxy_group_mode_hint": "选择代理组后，任务会按轮询方式自动切换代理地址。",
+        "proxy_provider_mode_hint": "根据代理池中保存的 Proxy-Free 配置即时拉取一个代理。",
+        "delete_proxy_group_confirm": "删除代理组 {name}？",
+        "proxy_group_meta": "{count} 个代理 | 创建于 {created_at}",
+        "pool_item_meta": "{source} | {protocol} | {country} | {status}",
+        "proxy_pool_sync_done": "代理池同步完成，共导入 {count} 条代理。",
+        "proxy_pool_filter_keyword": "搜索代理 / 国家 / 来源",
+        "proxy_pool_filter_protocol": "筛选协议",
+        "proxy_pool_filter_country": "筛选国家",
+        "proxy_pool_filter_source": "筛选来源",
+        "proxy_pool_filter_working": "仅看可用",
+        "proxy_pool_speed": "速度",
+        "proxy_pool_uptime": "在线率",
+        "proxy_pool_country": "国家",
+        "proxy_pool_protocol": "协议",
+        "proxy_pool_source": "来源",
+        "proxy_group_detail_title": "代理组详情",
+        "proxy_group_detail_desc": "查看成员、移除代理、拖动调整轮询顺序。",
+        "remove_group_member": "移除成员",
+        "move_up": "上移",
+        "move_down": "下移",
+        "save_group_order": "保存排序",
+        "group_member_meta": "{source} | {label}",
+        "empty_group_members": "当前代理组还没有成员",
         "field_proxy_url": "代理地址",
         "save_proxy": "保存代理",
         "section_tasks": "新建任务",
@@ -263,6 +325,7 @@ UI_TRANSLATIONS = {
         "nav_dashboard": "Dashboard",
         "nav_credentials": "Credentials",
         "nav_proxies": "Proxies",
+        "nav_proxy_pool": "Proxy Pool",
         "nav_create_task": "New Task",
         "nav_task_detail": "Task Detail",
         "nav_schedules": "Schedules",
@@ -299,10 +362,65 @@ UI_TRANSLATIONS = {
         "field_notes": "Notes",
         "save_credential": "Save credential",
         "section_proxies": "Proxy Management",
+        "section_proxy_pool": "Proxy Pool",
         "proxies_create_title": "Add proxy",
         "proxies_create_desc": "Save multiple proxies and promote one as the site-wide default.",
         "proxies_saved_title": "Saved proxies",
         "proxies_saved_desc": "Tasks can use the default proxy, a specific proxy, or no proxy at all.",
+        "proxies_group_assign_title": "Add To Proxy Group",
+        "proxies_group_assign_desc": "Multi-select saved proxies and batch assign them to an existing group.",
+        "proxy_groups_title": "Proxy Groups",
+        "proxy_groups_desc": "Combine multiple proxies so tasks can rotate through them automatically.",
+        "proxy_pool_provider_title": "Provider Settings",
+        "proxy_pool_provider_desc": "Configure tokens and filters here before syncing provider data.",
+        "proxy_pool_list_title": "Proxy Pool Entries",
+        "proxy_pool_list_desc": "Select multiple pool proxies and add them to a proxy group.",
+        "field_provider_token": "API Token",
+        "field_proxy_group_select": "Proxy group",
+        "field_proxy_group_name": "Group name",
+        "field_protocol": "Protocol",
+        "field_country": "Country",
+        "field_region": "Region/Search",
+        "field_anonymity": "Anonymity",
+        "field_min_speed": "Min speed",
+        "field_min_uptime": "Min uptime",
+        "field_sort_by": "Sort by",
+        "field_is_working": "Working only",
+        "proxy_mode_group": "Rotate proxy group",
+        "proxy_mode_provider": "Proxy-Free API",
+        "save_proxy_group": "Save proxy group",
+        "save_provider_settings": "Save provider settings",
+        "sync_proxy_pool": "Sync proxy pool",
+        "add_selected_to_group": "Add selected to group",
+        "choose_proxy_group": "Choose a proxy group",
+        "empty_proxy_groups": "No proxy groups yet",
+        "empty_proxy_pool": "No proxy pool entries yet",
+        "provider_status_ready": "Configured",
+        "provider_status_empty": "Not configured",
+        "proxy_group_mode_hint": "When a proxy group is selected, tasks rotate through its proxy URLs.",
+        "proxy_provider_mode_hint": "Fetch a proxy instantly using the saved Proxy-Free filters.",
+        "delete_proxy_group_confirm": "Delete proxy group {name}?",
+        "proxy_group_meta": "{count} proxies | Created at {created_at}",
+        "pool_item_meta": "{source} | {protocol} | {country} | {status}",
+        "proxy_pool_sync_done": "Proxy pool sync finished. Imported {count} proxies.",
+        "proxy_pool_filter_keyword": "Search proxy / country / source",
+        "proxy_pool_filter_protocol": "Filter protocol",
+        "proxy_pool_filter_country": "Filter country",
+        "proxy_pool_filter_source": "Filter source",
+        "proxy_pool_filter_working": "Working only",
+        "proxy_pool_speed": "Speed",
+        "proxy_pool_uptime": "Uptime",
+        "proxy_pool_country": "Country",
+        "proxy_pool_protocol": "Protocol",
+        "proxy_pool_source": "Source",
+        "proxy_group_detail_title": "Proxy Group Detail",
+        "proxy_group_detail_desc": "Review members, remove proxies, and reorder the rotation list.",
+        "remove_group_member": "Remove member",
+        "move_up": "Move up",
+        "move_down": "Move down",
+        "save_group_order": "Save order",
+        "group_member_meta": "{source} | {label}",
+        "empty_group_members": "This proxy group has no members yet",
         "field_proxy_url": "Proxy URL",
         "save_proxy": "Save proxy",
         "section_tasks": "Create Task",
@@ -517,6 +635,67 @@ def init_db() -> None:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS proxy_provider_settings (
+                provider_key TEXT PRIMARY KEY,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                api_token TEXT,
+                config_json TEXT NOT NULL DEFAULT '{}',
+                last_synced_at TEXT,
+                last_error TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS proxy_pool_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                provider_key TEXT NOT NULL,
+                remote_id TEXT,
+                proxy_url TEXT NOT NULL,
+                ip_address TEXT,
+                port INTEGER,
+                protocol TEXT,
+                country_code TEXT,
+                country_name TEXT,
+                anonymity TEXT,
+                speed REAL,
+                uptime REAL,
+                is_working INTEGER NOT NULL DEFAULT 1,
+                source_label TEXT,
+                metadata_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                UNIQUE(provider_key, proxy_url)
+            );
+
+            CREATE TABLE IF NOT EXISTS proxy_groups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                notes TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS proxy_group_members (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_id INTEGER NOT NULL,
+                proxy_url TEXT NOT NULL,
+                label TEXT,
+                source_type TEXT NOT NULL DEFAULT 'manual',
+                proxy_id INTEGER,
+                pool_item_id INTEGER,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                UNIQUE(group_id, proxy_url),
+                FOREIGN KEY(group_id) REFERENCES proxy_groups(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS proxy_group_states (
+                group_id INTEGER PRIMARY KEY,
+                next_index INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(group_id) REFERENCES proxy_groups(id)
+            );
+
             CREATE TABLE IF NOT EXISTS tasks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -587,6 +766,22 @@ def init_db() -> None:
             {
                 "source": "TEXT NOT NULL DEFAULT 'ui'",
                 "auto_delete_at": "TEXT",
+            },
+        )
+        ensure_columns(
+            conn,
+            "schedules",
+            {
+                "proxy_mode": "TEXT NOT NULL DEFAULT 'none'",
+                "proxy_id": "INTEGER",
+                "proxy_group_id": "INTEGER",
+            },
+        )
+        ensure_columns(
+            conn,
+            "proxy_group_members",
+            {
+                "sort_order": "INTEGER NOT NULL DEFAULT 0",
             },
         )
         conn.commit()
@@ -761,6 +956,77 @@ def get_proxies() -> list[dict[str, Any]]:
     return [row_to_dict(row) for row in fetch_all("SELECT * FROM proxies ORDER BY name")]
 
 
+def get_proxy_provider_settings() -> list[dict[str, Any]]:
+    rows = fetch_all("SELECT * FROM proxy_provider_settings ORDER BY provider_key ASC")
+    items: list[dict[str, Any]] = []
+    known = {**{key: None for key in PROXY_PROVIDER_KEYS}, **{str(row["provider_key"]): row for row in rows}}
+    for provider_key in PROXY_PROVIDER_KEYS:
+        row = known.get(provider_key)
+        if row is None:
+            items.append(
+                {
+                    "provider_key": provider_key,
+                    "provider_label": PROXY_PROVIDER_KEYS[provider_key],
+                    "enabled": True,
+                    "api_token": "",
+                    "config": {},
+                    "last_synced_at": None,
+                    "last_error": None,
+                    "is_configured": False,
+                }
+            )
+            continue
+        item = row_to_dict(row)
+        try:
+            item["config"] = json.loads(item.get("config_json") or "{}")
+        except Exception:
+            item["config"] = {}
+        item["provider_label"] = PROXY_PROVIDER_KEYS.get(provider_key, provider_key)
+        item["is_configured"] = bool(item.get("api_token")) if provider_key == "proxy-free.com" else True
+        items.append(item)
+    return items
+
+
+def get_proxy_pool_items() -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for row in fetch_all("SELECT * FROM proxy_pool_items ORDER BY updated_at DESC, id DESC"):
+        item = row_to_dict(row)
+        try:
+            item["metadata"] = json.loads(item.get("metadata_json") or "{}")
+        except Exception:
+            item["metadata"] = {}
+        items.append(item)
+    return items
+
+
+def get_proxy_group(group_id: int) -> sqlite3.Row:
+    row = fetch_one("SELECT * FROM proxy_groups WHERE id = ?", (group_id,))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Proxy group not found")
+    return row
+
+
+def get_proxy_groups() -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    for row in fetch_all("SELECT * FROM proxy_groups ORDER BY name ASC"):
+        item = row_to_dict(row)
+        members = [row_to_dict(member) for member in fetch_all("SELECT * FROM proxy_group_members WHERE group_id = ? ORDER BY sort_order ASC, id ASC", (int(row["id"]),))]
+        for member in members:
+            if member.get("pool_item_id"):
+                pool_row = fetch_one("SELECT protocol, country_code, country_name, source_label, speed, uptime FROM proxy_pool_items WHERE id = ?", (int(member["pool_item_id"]),))
+                if pool_row is not None:
+                    member["pool_protocol"] = pool_row["protocol"]
+                    member["pool_country_code"] = pool_row["country_code"]
+                    member["pool_country_name"] = pool_row["country_name"]
+                    member["pool_source_label"] = pool_row["source_label"]
+                    member["pool_speed"] = pool_row["speed"]
+                    member["pool_uptime"] = pool_row["uptime"]
+        item["members"] = members
+        item["count"] = len(members)
+        groups.append(item)
+    return groups
+
+
 def get_schedules() -> list[dict[str, Any]]:
     return [row_to_dict(row) for row in fetch_all("SELECT * FROM schedules ORDER BY id DESC")]
 
@@ -793,6 +1059,315 @@ def get_schedule(schedule_id: int) -> sqlite3.Row:
     if row is None:
         raise HTTPException(status_code=404, detail="Schedule not found")
     return row
+
+
+def validate_proxy_provider(provider_key: str) -> str:
+    if provider_key not in PROXY_PROVIDER_KEYS:
+        raise HTTPException(status_code=400, detail="Unsupported proxy provider")
+    return provider_key
+
+
+def sanitize_provider_config(payload: ProxyProviderSettingsPayload) -> dict[str, Any]:
+    return {
+        "country": (payload.country or "").strip() or None,
+        "region": (payload.region or "").strip() or None,
+        "protocol": (payload.protocol or "").strip().upper() or None,
+        "anonymity": (payload.anonymity or "").strip() or None,
+        "min_speed": payload.min_speed,
+        "min_uptime": payload.min_uptime,
+        "is_working": bool(payload.is_working),
+        "sort_by": (payload.sort_by or "").strip() or None,
+        "per_page": payload.per_page,
+    }
+
+
+def save_proxy_provider_settings(payload: ProxyProviderSettingsPayload) -> None:
+    provider_key = validate_proxy_provider(payload.provider_key)
+    timestamp = now_iso()
+    config = sanitize_provider_config(payload)
+    execute_no_return(
+        """
+        INSERT INTO proxy_provider_settings (provider_key, enabled, api_token, config_json, last_synced_at, last_error, created_at, updated_at)
+        VALUES (?, ?, ?, ?, NULL, NULL, ?, ?)
+        ON CONFLICT(provider_key) DO UPDATE SET
+            enabled = excluded.enabled,
+            api_token = excluded.api_token,
+            config_json = excluded.config_json,
+            updated_at = excluded.updated_at
+        """,
+        (
+            provider_key,
+            1 if payload.enabled else 0,
+            (payload.api_token or "").strip() or None,
+            json.dumps(config, ensure_ascii=False),
+            timestamp,
+            timestamp,
+        ),
+    )
+
+
+def get_proxy_provider_setting(provider_key: str) -> dict[str, Any]:
+    validate_proxy_provider(provider_key)
+    for item in get_proxy_provider_settings():
+        if item["provider_key"] == provider_key:
+            return item
+    raise HTTPException(status_code=404, detail="Proxy provider not found")
+
+
+def make_proxy_url(protocol: str | None, ip_address: str | None, port: int | None) -> str | None:
+    if not ip_address or not port:
+        return None
+    scheme = (protocol or "http").strip().lower()
+    if scheme == "https":
+        scheme = "http"
+    return f"{scheme}://{ip_address}:{int(port)}"
+
+
+def upsert_pool_item(*, provider_key: str, proxy_url: str, remote_id: str | None, ip_address: str | None, port: int | None, protocol: str | None, country_code: str | None, country_name: str | None, anonymity: str | None, speed: float | None, uptime: float | None, is_working: bool, source_label: str, metadata: dict[str, Any]) -> None:
+    timestamp = now_iso()
+    execute_no_return(
+        """
+        INSERT INTO proxy_pool_items (
+            provider_key, remote_id, proxy_url, ip_address, port, protocol, country_code, country_name,
+            anonymity, speed, uptime, is_working, source_label, metadata_json, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(provider_key, proxy_url) DO UPDATE SET
+            remote_id = excluded.remote_id,
+            ip_address = excluded.ip_address,
+            port = excluded.port,
+            protocol = excluded.protocol,
+            country_code = excluded.country_code,
+            country_name = excluded.country_name,
+            anonymity = excluded.anonymity,
+            speed = excluded.speed,
+            uptime = excluded.uptime,
+            is_working = excluded.is_working,
+            source_label = excluded.source_label,
+            metadata_json = excluded.metadata_json,
+            updated_at = excluded.updated_at
+        """,
+        (
+            provider_key,
+            remote_id,
+            proxy_url,
+            ip_address,
+            port,
+            protocol,
+            country_code,
+            country_name,
+            anonymity,
+            speed,
+            uptime,
+            1 if is_working else 0,
+            source_label,
+            json.dumps(metadata, ensure_ascii=False),
+            timestamp,
+            timestamp,
+        ),
+    )
+
+
+def sync_proxy_free_provider() -> int:
+    settings = get_proxy_provider_setting("proxy-free.com")
+    token = (settings.get("api_token") or "").strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="Proxy-Free API token is not configured")
+    config = settings.get("config") or {}
+    params: dict[str, Any] = {"per_page": int(config.get("per_page") or 50)}
+    if config.get("protocol"):
+        params["protocol"] = config["protocol"]
+    if config.get("country"):
+        params["country"] = config["country"]
+    if config.get("region"):
+        params["search"] = config["region"]
+    if config.get("anonymity"):
+        params["anonymity"] = config["anonymity"]
+    if config.get("min_speed") is not None:
+        params["min_speed"] = config["min_speed"]
+    if config.get("min_uptime") is not None:
+        params["min_uptime"] = config["min_uptime"]
+    if config.get("is_working"):
+        params["is_working"] = "true"
+    if config.get("sort_by"):
+        params["sort_by"] = config["sort_by"]
+    response = requests.get(
+        "https://proxy-free.com/api/v1/premium-proxies/",
+        headers={"Authorization": f"Bearer {token}"},
+        params=params,
+        timeout=20,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    data = payload.get("data") or []
+    imported = 0
+    for entry in data:
+        protocol = str(entry.get("protocol") or "HTTP").upper()
+        country = entry.get("country") or {}
+        proxy_url = make_proxy_url(protocol, entry.get("ip_address"), entry.get("port"))
+        if not proxy_url:
+            continue
+        upsert_pool_item(
+            provider_key="proxy-free.com",
+            proxy_url=proxy_url,
+            remote_id=str(entry.get("id")) if entry.get("id") is not None else None,
+            ip_address=entry.get("ip_address"),
+            port=int(entry.get("port")) if entry.get("port") is not None else None,
+            protocol=protocol,
+            country_code=country.get("code"),
+            country_name=country.get("name"),
+            anonymity=entry.get("anonymity"),
+            speed=float(entry.get("speed")) if entry.get("speed") is not None else None,
+            uptime=float(entry.get("uptime")) if entry.get("uptime") is not None else None,
+            is_working=bool(entry.get("is_working")),
+            source_label=PROXY_PROVIDER_KEYS["proxy-free.com"],
+            metadata=entry,
+        )
+        imported += 1
+    execute_no_return(
+        "UPDATE proxy_provider_settings SET last_synced_at = ?, last_error = NULL WHERE provider_key = ?",
+        (now_iso(), "proxy-free.com"),
+    )
+    return imported
+
+
+def sync_openproxylist_provider() -> int:
+    imported = 0
+    sources = {
+        "HTTP": "https://raw.githubusercontent.com/roosterkid/openproxylist/main/HTTPS.txt",
+        "SOCKS4": "https://raw.githubusercontent.com/roosterkid/openproxylist/main/SOCKS4.txt",
+        "SOCKS5": "https://raw.githubusercontent.com/roosterkid/openproxylist/main/SOCKS5.txt",
+    }
+    for protocol, url in sources.items():
+        response = requests.get(url, timeout=20)
+        response.raise_for_status()
+        for raw_line in response.text.splitlines():
+            line = raw_line.strip()
+            if not line or ":" not in line:
+                continue
+            host, _, port_raw = line.rpartition(":")
+            if not host or not port_raw.isdigit():
+                continue
+            proxy_url = make_proxy_url(protocol, host, int(port_raw))
+            if not proxy_url:
+                continue
+            upsert_pool_item(
+                provider_key="openproxylist.com",
+                proxy_url=proxy_url,
+                remote_id=None,
+                ip_address=host,
+                port=int(port_raw),
+                protocol=protocol,
+                country_code=None,
+                country_name=None,
+                anonymity=None,
+                speed=None,
+                uptime=None,
+                is_working=True,
+                source_label=PROXY_PROVIDER_KEYS["openproxylist.com"],
+                metadata={"source_url": url},
+            )
+            imported += 1
+    row = fetch_one("SELECT 1 FROM proxy_provider_settings WHERE provider_key = ?", ("openproxylist.com",))
+    if row is None:
+        execute_no_return(
+            "INSERT INTO proxy_provider_settings (provider_key, enabled, api_token, config_json, last_synced_at, last_error, created_at, updated_at) VALUES (?, 1, NULL, '{}', ?, NULL, ?, ?)",
+            ("openproxylist.com", now_iso(), now_iso(), now_iso()),
+        )
+    else:
+        execute_no_return(
+            "UPDATE proxy_provider_settings SET last_synced_at = ?, last_error = NULL, updated_at = ? WHERE provider_key = ?",
+            (now_iso(), now_iso(), "openproxylist.com"),
+        )
+    return imported
+
+
+def sync_proxy_provider(provider_key: str) -> int:
+    validate_proxy_provider(provider_key)
+    try:
+        if provider_key == "proxy-free.com":
+            return sync_proxy_free_provider()
+        if provider_key == "openproxylist.com":
+            return sync_openproxylist_provider()
+    except requests.RequestException as exc:
+        execute_no_return(
+            "UPDATE proxy_provider_settings SET last_error = ?, updated_at = ? WHERE provider_key = ?",
+            (str(exc), now_iso(), provider_key),
+        )
+        raise HTTPException(status_code=502, detail=f"Provider sync failed: {exc}")
+    raise HTTPException(status_code=400, detail="Unsupported proxy provider")
+
+
+def add_group_members(*, group_id: int, proxy_urls: list[str], proxy_ids: list[int], pool_item_ids: list[int]) -> None:
+    timestamp = now_iso()
+    seen: set[str] = set()
+    max_order_row = fetch_one("SELECT COALESCE(MAX(sort_order), -1) AS max_order FROM proxy_group_members WHERE group_id = ?", (group_id,))
+    next_order = int(max_order_row["max_order"]) + 1 if max_order_row is not None else 0
+
+    def insert_member(proxy_url: str, label: str | None, source_type: str, proxy_id: int | None, pool_item_id: int | None) -> None:
+        nonlocal next_order
+        normalized = proxy_url.strip()
+        if not normalized or normalized in seen:
+            return
+        seen.add(normalized)
+        execute_no_return(
+            "INSERT OR IGNORE INTO proxy_group_members (group_id, proxy_url, label, source_type, proxy_id, pool_item_id, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (group_id, normalized, label, source_type, proxy_id, pool_item_id, next_order, timestamp),
+        )
+        next_order += 1
+
+    for value in proxy_urls:
+        normalized = value.strip()
+        if normalized:
+            insert_member(normalized, normalized, "manual", None, None)
+    for proxy_id in proxy_ids:
+        proxy = get_proxy(proxy_id)
+        insert_member(str(proxy["proxy_url"]), str(proxy["name"]), "manual_saved", int(proxy["id"]), None)
+    for pool_item_id in pool_item_ids:
+        row = fetch_one("SELECT * FROM proxy_pool_items WHERE id = ?", (pool_item_id,))
+        if row is None:
+            continue
+        insert_member(str(row["proxy_url"]), str(row["source_label"] or row["proxy_url"]), "pool", None, int(row["id"]))
+
+
+def get_next_proxy_from_group(group_id: int) -> str:
+    members = fetch_all("SELECT * FROM proxy_group_members WHERE group_id = ? ORDER BY sort_order ASC, id ASC", (group_id,))
+    if not members:
+        raise HTTPException(status_code=400, detail="Selected proxy group has no members")
+    state = fetch_one("SELECT * FROM proxy_group_states WHERE group_id = ?", (group_id,))
+    next_index = int(state["next_index"]) if state is not None else 0
+    member = members[next_index % len(members)]
+    new_index = (next_index + 1) % len(members)
+    timestamp = now_iso()
+    execute_no_return(
+        "INSERT INTO proxy_group_states (group_id, next_index, updated_at) VALUES (?, ?, ?) ON CONFLICT(group_id) DO UPDATE SET next_index = excluded.next_index, updated_at = excluded.updated_at",
+        (group_id, new_index, timestamp),
+    )
+    return str(member["proxy_url"])
+
+
+def get_proxy_group_member(group_id: int, member_id: int) -> sqlite3.Row:
+    row = fetch_one("SELECT * FROM proxy_group_members WHERE group_id = ? AND id = ?", (group_id, member_id))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Proxy group member not found")
+    return row
+
+
+def reorder_proxy_group_members(group_id: int, member_ids: list[int]) -> None:
+    members = fetch_all("SELECT id FROM proxy_group_members WHERE group_id = ? ORDER BY sort_order ASC, id ASC", (group_id,))
+    existing_ids = [int(row["id"]) for row in members]
+    if sorted(existing_ids) != sorted(member_ids):
+        raise HTTPException(status_code=400, detail="Member order does not match current proxy group members")
+    timestamp = now_iso()
+    for index, member_id in enumerate(member_ids):
+        execute_no_return(
+            "UPDATE proxy_group_members SET sort_order = ? WHERE group_id = ? AND id = ?",
+            (index, group_id, member_id),
+        )
+    execute_no_return(
+        "UPDATE proxy_groups SET updated_at = ? WHERE id = ?",
+        (timestamp, group_id),
+    )
 
 
 def get_task(task_id: int) -> sqlite3.Row:
@@ -829,6 +1404,28 @@ def resolve_proxy_value(proxy_mode: str, proxy_id: int | None) -> str | None:
         if proxy_id is None:
             raise HTTPException(status_code=400, detail="A proxy must be selected")
         return str(get_proxy(proxy_id)["proxy_url"])
+    raise HTTPException(status_code=400, detail="Unsupported proxy mode")
+
+
+def resolve_proxy_selection(proxy_mode: str, proxy_id: int | None, proxy_group_id: int | None) -> str | None:
+    mode = proxy_mode or "none"
+    if mode in {"none", "default", "custom"}:
+        return resolve_proxy_value(mode, proxy_id)
+    if mode == "group":
+        if proxy_group_id is None:
+            raise HTTPException(status_code=400, detail="A proxy group must be selected")
+        get_proxy_group(proxy_group_id)
+        return get_next_proxy_from_group(proxy_group_id)
+    if mode == "provider":
+        imported = sync_proxy_provider("proxy-free.com")
+        if imported <= 0:
+            raise HTTPException(status_code=400, detail="Proxy-Free returned no proxies")
+        row = fetch_one(
+            "SELECT * FROM proxy_pool_items WHERE provider_key = 'proxy-free.com' AND is_working = 1 ORDER BY updated_at DESC, id DESC LIMIT 1"
+        )
+        if row is None:
+            raise HTTPException(status_code=400, detail="No Proxy-Free proxy is available")
+        return str(row["proxy_url"])
     raise HTTPException(status_code=400, detail="Unsupported proxy mode")
 
 
@@ -914,13 +1511,53 @@ class ProxyCreate(BaseModel):
     notes: str | None = None
 
 
+class ProxyProviderSettingsPayload(BaseModel):
+    provider_key: str
+    enabled: bool = True
+    api_token: str | None = None
+    country: str | None = None
+    region: str | None = None
+    protocol: str | None = None
+    anonymity: str | None = None
+    min_speed: float | None = None
+    min_uptime: float | None = None
+    is_working: bool = True
+    sort_by: str | None = None
+    per_page: int = Field(default=50, ge=1, le=100)
+
+
+class ProxyPoolSyncPayload(BaseModel):
+    provider_key: str
+
+
+class ProxyGroupCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    notes: str | None = None
+    proxy_urls: list[str] = Field(default_factory=list)
+    proxy_ids: list[int] = Field(default_factory=list)
+    pool_item_ids: list[int] = Field(default_factory=list)
+
+
+class ProxyGroupAssignPayload(BaseModel):
+    group_id: int
+    proxy_urls: list[str] = Field(default_factory=list)
+    proxy_ids: list[int] = Field(default_factory=list)
+    pool_item_ids: list[int] = Field(default_factory=list)
+
+
+class ProxyGroupMemberOrderPayload(BaseModel):
+    member_ids: list[int] = Field(min_length=1)
+
+
 class ScheduleCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     platform: str
     quantity: int = Field(ge=1, le=100000)
     concurrency: int = Field(default=1, ge=1, le=64)
     time_of_day: str = Field(pattern=r"^\d{2}:\d{2}$")
-    use_proxy: bool = False
+    proxy_mode: str = "none"
+    proxy_id: int | None = None
+    proxy_group_id: int | None = None
     enabled: bool = True
 
 
@@ -933,6 +1570,7 @@ class TaskCreate(BaseModel):
     concurrency: int = Field(default=1, ge=1, le=64)
     proxy_mode: str = "none"
     proxy_id: int | None = None
+    proxy_group_id: int | None = None
 
 
 class ExternalTaskCreate(BaseModel):
@@ -966,6 +1604,8 @@ class TaskResolvedConfig:
     captcha_credential_id: int | None
     proxy_value: str | None
     proxy_mode: str
+    proxy_id: int | None
+    proxy_group_id: int | None
     source: str
     auto_delete_at: str | None
     requested_config: dict[str, Any]
@@ -987,6 +1627,7 @@ def resolve_task_configuration(
     captcha_credential_id: int | None,
     proxy_mode: str,
     proxy_id: int | None,
+    proxy_group_id: int | None,
     source: str,
     auto_delete_at: str | None,
 ) -> tuple[str, TaskResolvedConfig]:
@@ -1004,7 +1645,7 @@ def resolve_task_configuration(
 
     proxy_value = None
     if spec["supports_proxy"]:
-        proxy_value = resolve_proxy_value(proxy_mode, proxy_id)
+        proxy_value = resolve_proxy_selection(proxy_mode, proxy_id, proxy_group_id)
 
     requested_config = {
         "name": resolved_name,
@@ -1014,6 +1655,7 @@ def resolve_task_configuration(
         "source": source,
         "proxy_mode": proxy_mode,
         "proxy_id": proxy_id,
+        "proxy_group_id": proxy_group_id,
         "proxy_value": proxy_value,
         "email_credential_id": int(email_row["id"]) if email_row else None,
         "captcha_credential_id": int(captcha_row["id"]) if captcha_row else None,
@@ -1027,6 +1669,8 @@ def resolve_task_configuration(
         captcha_credential_id=int(captcha_row["id"]) if captcha_row else None,
         proxy_value=proxy_value,
         proxy_mode=proxy_mode,
+        proxy_id=proxy_id,
+        proxy_group_id=proxy_group_id,
         source=source,
         auto_delete_at=auto_delete_at,
         requested_config=requested_config,
@@ -1286,7 +1930,9 @@ class TaskSupervisor:
             try:
                 quantity = int(schedule["quantity"])
                 concurrency = int(schedule["concurrency"])
-                proxy_mode = "default" if int(schedule["use_proxy"] or 0) else "none"
+                proxy_mode = str(schedule["proxy_mode"] or "none")
+                proxy_id = int(schedule["proxy_id"]) if schedule["proxy_id"] is not None else None
+                proxy_group_id = int(schedule["proxy_group_id"]) if schedule["proxy_group_id"] is not None else None
                 schedule_name = f"{schedule['name']} {today}"
                 _, config = resolve_task_configuration(
                     name=schedule_name,
@@ -1296,7 +1942,8 @@ class TaskSupervisor:
                     email_credential_id=None,
                     captcha_credential_id=None,
                     proxy_mode=proxy_mode,
-                    proxy_id=None,
+                    proxy_id=proxy_id,
+                    proxy_group_id=proxy_group_id,
                     source="schedule",
                     auto_delete_at=None,
                 )
@@ -1385,6 +2032,9 @@ def state_payload() -> dict[str, Any]:
         "defaults": get_defaults(),
         "credentials": get_credentials(),
         "proxies": get_proxies(),
+        "proxy_provider_settings": get_proxy_provider_settings(),
+        "proxy_pool_items": get_proxy_pool_items(),
+        "proxy_groups": get_proxy_groups(),
         "tasks": get_tasks(),
         "schedules": get_schedules(),
         "api_keys": get_api_keys(),
@@ -1567,6 +2217,85 @@ async def create_proxy(payload: ProxyCreate, request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "id": proxy_id})
 
 
+@app.post("/api/proxy-providers")
+async def save_proxy_provider(payload: ProxyProviderSettingsPayload, request: Request) -> JSONResponse:
+    require_authenticated(request)
+    save_proxy_provider_settings(payload)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/proxy-pool/sync")
+async def sync_proxy_pool(payload: ProxyPoolSyncPayload, request: Request) -> JSONResponse:
+    require_authenticated(request)
+    imported = sync_proxy_provider(payload.provider_key)
+    return JSONResponse({"ok": True, "imported": imported})
+
+
+@app.post("/api/proxy-groups")
+async def create_proxy_group(payload: ProxyGroupCreate, request: Request) -> JSONResponse:
+    require_authenticated(request)
+    timestamp = now_iso()
+    group_id = execute(
+        "INSERT INTO proxy_groups (name, notes, created_at, updated_at) VALUES (?, ?, ?, ?)",
+        (payload.name.strip(), (payload.notes or "").strip() or None, timestamp, timestamp),
+    )
+    add_group_members(
+        group_id=group_id,
+        proxy_urls=payload.proxy_urls,
+        proxy_ids=payload.proxy_ids,
+        pool_item_ids=payload.pool_item_ids,
+    )
+    return JSONResponse({"ok": True, "id": group_id})
+
+
+@app.post("/api/proxy-groups/assign")
+async def assign_proxy_group_members(payload: ProxyGroupAssignPayload, request: Request) -> JSONResponse:
+    require_authenticated(request)
+    get_proxy_group(payload.group_id)
+    add_group_members(
+        group_id=payload.group_id,
+        proxy_urls=payload.proxy_urls,
+        proxy_ids=payload.proxy_ids,
+        pool_item_ids=payload.pool_item_ids,
+    )
+    execute_no_return("UPDATE proxy_groups SET updated_at = ? WHERE id = ?", (now_iso(), payload.group_id))
+    return JSONResponse({"ok": True})
+
+
+@app.delete("/api/proxy-groups/{group_id}")
+async def delete_proxy_group(group_id: int, request: Request) -> JSONResponse:
+    require_authenticated(request)
+    get_proxy_group(group_id)
+    active = fetch_one(
+        "SELECT id FROM tasks WHERE requested_config_json LIKE ? AND status IN ('queued', 'running', 'stopping')",
+        (f'%"proxy_group_id": {group_id}%',),
+    )
+    if active is not None:
+        raise HTTPException(status_code=409, detail="Proxy group is used by an active task")
+    execute_no_return("DELETE FROM proxy_group_members WHERE group_id = ?", (group_id,))
+    execute_no_return("DELETE FROM proxy_group_states WHERE group_id = ?", (group_id,))
+    execute_no_return("DELETE FROM proxy_groups WHERE id = ?", (group_id,))
+    return JSONResponse({"ok": True})
+
+
+@app.delete("/api/proxy-groups/{group_id}/members/{member_id}")
+async def delete_proxy_group_member(group_id: int, member_id: int, request: Request) -> JSONResponse:
+    require_authenticated(request)
+    get_proxy_group(group_id)
+    get_proxy_group_member(group_id, member_id)
+    execute_no_return("DELETE FROM proxy_group_members WHERE group_id = ? AND id = ?", (group_id, member_id))
+    execute_no_return("UPDATE proxy_groups SET updated_at = ? WHERE id = ?", (now_iso(), group_id))
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/proxy-groups/{group_id}/reorder")
+async def reorder_proxy_group(group_id: int, payload: ProxyGroupMemberOrderPayload, request: Request) -> JSONResponse:
+    require_authenticated(request)
+    get_proxy_group(group_id)
+    reorder_proxy_group_members(group_id, payload.member_ids)
+    return JSONResponse({"ok": True})
+
+
 @app.delete("/api/proxies/{proxy_id}")
 async def delete_proxy(proxy_id: int, request: Request) -> JSONResponse:
     require_authenticated(request)
@@ -1592,6 +2321,7 @@ async def create_task(payload: TaskCreate, request: Request) -> JSONResponse:
         captcha_credential_id=payload.captcha_credential_id,
         proxy_mode=payload.proxy_mode,
         proxy_id=payload.proxy_id,
+        proxy_group_id=payload.proxy_group_id,
         source="ui",
         auto_delete_at=None,
     )
@@ -1651,11 +2381,12 @@ async def delete_task(task_id: int, request: Request) -> JSONResponse:
 async def create_schedule(payload: ScheduleCreate, request: Request) -> JSONResponse:
     require_authenticated(request)
     validate_platform(payload.platform)
+    resolve_proxy_selection(payload.proxy_mode, payload.proxy_id, payload.proxy_group_id) if PLATFORMS[payload.platform]["supports_proxy"] else None
     timestamp = now_iso()
     schedule_id = execute(
         """
-        INSERT INTO schedules (name, platform, quantity, concurrency, time_of_day, use_proxy, enabled, last_run_date, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+        INSERT INTO schedules (name, platform, quantity, concurrency, time_of_day, proxy_mode, proxy_id, proxy_group_id, enabled, last_run_date, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
         """,
         (
             payload.name.strip(),
@@ -1663,7 +2394,9 @@ async def create_schedule(payload: ScheduleCreate, request: Request) -> JSONResp
             payload.quantity,
             payload.concurrency,
             payload.time_of_day,
-            1 if payload.use_proxy else 0,
+            payload.proxy_mode,
+            payload.proxy_id,
+            payload.proxy_group_id,
             1 if payload.enabled else 0,
             timestamp,
             timestamp,
@@ -1724,6 +2457,7 @@ async def external_create_task(payload: ExternalTaskCreate, request: Request) ->
         captcha_credential_id=None,
         proxy_mode=proxy_mode,
         proxy_id=None,
+        proxy_group_id=None,
         source="api",
         auto_delete_at=auto_delete_at,
     )
