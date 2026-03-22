@@ -18,6 +18,7 @@ import {
 import { BusyButton, Modal } from './ui.jsx';
 
 const SIDEBAR_LOGO_SRC = '/static/MAISHANhlogomini.png';
+const DOCS_LOG_IMAGE_SRC = '/static/docs-log-preview.jpg';
 const PROJECT_GITHUB_URL = 'https://github.com/Maishan-Inc/MREGISTER';
 const SECTION_TITLE_KEYS = {
   dashboard: 'section_overview',
@@ -359,6 +360,7 @@ export function ConsoleApp() {
   const [busyKeys, setBusyKeys] = useState({});
   const [loadError, setLoadError] = useState('');
   const [loaded, setLoaded] = useState(false);
+  const [flashNotice, setFlashNotice] = useState(null);
   const [taskFilterStatus, setTaskFilterStatus] = useState('all');
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [flashKey, setFlashKey] = useState('');
@@ -410,6 +412,7 @@ export function ConsoleApp() {
     linked: false,
     last_error: '',
   });
+  const [cpamcDirty, setCpamcDirty] = useState(false);
   const [apiKeyName, setApiKeyName] = useState('');
   const modalResolverRef = useRef(null);
   const consoleRef = useRef(null);
@@ -459,6 +462,14 @@ export function ConsoleApp() {
   }, [visibleTask?.id, visibleTask?.console_tail]);
 
   useEffect(() => {
+    if (!flashNotice) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setFlashNotice(null), 3200);
+    return () => window.clearTimeout(timer);
+  }, [flashNotice]);
+
+  useEffect(() => {
     refreshState({ initial: true }).catch((error) => {
       setLoadError(error.message);
       setLoaded(true);
@@ -480,13 +491,15 @@ export function ConsoleApp() {
       default_yescaptcha_credential_id: payload.defaults.default_yescaptcha_credential_id ? String(payload.defaults.default_yescaptcha_credential_id) : '',
       default_proxy_id: payload.defaults.default_proxy_id ? String(payload.defaults.default_proxy_id) : '',
     });
-    setCpamcDraft({
-      enabled: Boolean(payload.cpamc?.enabled),
-      base_url: payload.cpamc?.base_url || '',
-      management_key: payload.cpamc?.management_key || '',
-      linked: Boolean(payload.cpamc?.linked),
-      last_error: payload.cpamc?.last_error || '',
-    });
+    if (initial || !cpamcDirty) {
+      setCpamcDraft({
+        enabled: Boolean(payload.cpamc?.enabled),
+        base_url: payload.cpamc?.base_url || '',
+        management_key: payload.cpamc?.management_key || '',
+        linked: Boolean(payload.cpamc?.linked),
+        last_error: payload.cpamc?.last_error || '',
+      });
+    }
     setTaskDraft((current) => normalizeTaskDraft(initial ? initialTaskDraft(payload.platforms) : current, payload.platforms, payload.credentials, payload.proxies));
     setScheduleDraft((current) => {
       const platform = payload.platforms[current.platform] ? current.platform : (getPlatformKeys(payload.platforms)[0] || 'chatgpt-register-v2');
@@ -671,6 +684,7 @@ export function ConsoleApp() {
             management_key: cpamcDraft.management_key,
           }),
         });
+        setCpamcDirty(false);
         await refreshState();
       } catch (error) {
         setLoadError(error.message);
@@ -689,10 +703,15 @@ export function ConsoleApp() {
             management_key: cpamcDraft.management_key,
           }),
         });
+        setCpamcDirty(false);
+        await refreshState();
       } catch (error) {
         setLoadError(error.message);
-      } finally {
-        await refreshState().catch(() => {});
+        setCpamcDraft((current) => ({
+          ...current,
+          linked: false,
+          last_error: error.message,
+        }));
       }
     });
   }
@@ -791,12 +810,14 @@ export function ConsoleApp() {
     await withBusy(`cpamc-import-${task.id}`, async () => {
       try {
         const result = await api(`/api/tasks/${task.id}/cpamc-import`, { method: 'POST' });
-        if (result.failed_count) {
-          window.alert(tr('cpamc_import_partial', { success: result.imported_count, failed: result.failed_count }));
-        } else {
-          window.alert(tr('cpamc_import_success', { count: result.imported_count }));
-        }
         await refreshState();
+        await openModal({
+          title: tr('cpamc_import_result_title'),
+          message: result.failed_count
+            ? tr('cpamc_import_partial', { success: result.imported_count, failed: result.failed_count })
+            : tr('cpamc_import_success', { count: result.imported_count }),
+          confirmLabel: tr('modal_close'),
+        });
       } catch (error) {
         setLoadError(error.message);
       }
@@ -1329,6 +1350,9 @@ export function ConsoleApp() {
     const cpamcStatus = cpamcDraft.enabled
       ? (cpamcDraft.linked ? tr('cpamc_status_linked') : tr('cpamc_status_unlinked'))
       : tr('cpamc_status_disabled');
+    const cpamcStatusClass = cpamcDraft.enabled
+      ? (cpamcDraft.linked ? 'status-pill--linked' : 'status-pill--queued')
+      : 'status-pill--disabled';
     return (
       <section className="section-card active">
         <article className="panel">
@@ -1337,34 +1361,45 @@ export function ConsoleApp() {
               <h3>{tr('cpamc_title')}</h3>
               <span>{tr('cpamc_desc')}</span>
             </div>
-            <span className={`status-pill ${cpamcDraft.linked ? 'status-pill--completed' : 'status-pill--queued'}`.trim()}>{cpamcStatus}</span>
+            <div className="cpamc-head-actions">
+              <label className={`cpamc-switch ${cpamcDraft.enabled ? 'is-enabled' : ''}`.trim()}>
+                <input
+                  type="checkbox"
+                  checked={cpamcDraft.enabled}
+                  onChange={(event) => {
+                    setCpamcDirty(true);
+                    setCpamcDraft((current) => ({
+                      ...current,
+                      enabled: event.target.checked,
+                      linked: false,
+                      last_error: '',
+                    }));
+                  }}
+                />
+                <span className="cpamc-switch-track" aria-hidden="true">
+                  <span className="cpamc-switch-thumb" />
+                </span>
+                <span className="cpamc-switch-label">{tr('field_cpamc_enabled')}</span>
+              </label>
+              <span className={`status-pill ${cpamcStatusClass}`.trim()}>{cpamcStatus}</span>
+            </div>
           </div>
           <form className="stack" onSubmit={handleCpamcSave}>
-            <label className="checkbox-row field-card field-card--checkbox">
-              <input
-                type="checkbox"
-                checked={cpamcDraft.enabled}
-                onChange={(event) => setCpamcDraft((current) => ({
-                  ...current,
-                  enabled: event.target.checked,
-                  linked: false,
-                  last_error: '',
-                }))}
-              />
-              <span>{tr('field_cpamc_enabled')}</span>
-            </label>
             <label className="field-card">
               <span>{tr('field_cpamc_base_url')}</span>
               <input
                 required={cpamcDraft.enabled}
                 value={cpamcDraft.base_url}
                 placeholder={tr('field_cpamc_base_url_placeholder')}
-                onChange={(event) => setCpamcDraft((current) => ({
-                  ...current,
-                  base_url: event.target.value,
-                  linked: false,
-                  last_error: '',
-                }))}
+                onChange={(event) => {
+                  setCpamcDirty(true);
+                  setCpamcDraft((current) => ({
+                    ...current,
+                    base_url: event.target.value,
+                    linked: false,
+                    last_error: '',
+                  }));
+                }}
               />
             </label>
             <label className="field-card">
@@ -1374,12 +1409,15 @@ export function ConsoleApp() {
                 required={cpamcDraft.enabled}
                 value={cpamcDraft.management_key}
                 placeholder={tr('field_cpamc_management_key_placeholder')}
-                onChange={(event) => setCpamcDraft((current) => ({
-                  ...current,
-                  management_key: event.target.value,
-                  linked: false,
-                  last_error: '',
-                }))}
+                onChange={(event) => {
+                  setCpamcDirty(true);
+                  setCpamcDraft((current) => ({
+                    ...current,
+                    management_key: event.target.value,
+                    linked: false,
+                    last_error: '',
+                  }));
+                }}
               />
             </label>
             {cpamcDraft.last_error ? <p className="field-tip">{tr('cpamc_last_error', { value: cpamcDraft.last_error })}</p> : null}
@@ -1588,6 +1626,25 @@ Authorization: Bearer YOUR_API_KEY`,
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -o result.zip`,
     };
+    const feature = isZh ? {
+      title: '新增功能：日志',
+      text: 'MREGISTER 现在把任务日志放到更直观的位置。创建任务后可以直接进入任务详情，持续查看脚本启动、运行、报错和收尾输出，不需要回到命令行窗口手动追踪。',
+      items: [
+        '支持实时查看当前任务输出。',
+        '任务结束后仍可回看已保存的历史日志。',
+        '更适合排查导入失败、凭据异常、网络问题和脚本执行中断。',
+      ],
+      imageAlt: 'MREGISTER 日志功能预览',
+    } : {
+      title: 'New Feature: Logs',
+      text: 'MREGISTER now exposes task logs in a clearer workflow. After creating a task, you can open Task Detail to follow startup output, runtime progress, errors, and final export messages without tailing the CLI manually.',
+      items: [
+        'Inspect live task output in real time.',
+        'Review persisted logs after the task finishes.',
+        'Useful for diagnosing import failures, credential issues, network problems, and interrupted runs.',
+      ],
+      imageAlt: 'MREGISTER log feature preview',
+    };
 
     return (
       <section className="section-card active">
@@ -1595,6 +1652,19 @@ Authorization: Bearer YOUR_API_KEY`,
           <section className="docs-hero">
             <h3>{docs.heroTitle}</h3>
             <p>{docs.heroText}</p>
+          </section>
+
+          <section className="doc-card doc-feature">
+            <div>
+              <h3>{feature.title}</h3>
+              <p>{feature.text}</p>
+              <ul className="doc-note-list">
+                {feature.items.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </div>
+            <div className="doc-media-frame">
+              <img className="doc-media" src={DOCS_LOG_IMAGE_SRC} alt={feature.imageAlt} />
+            </div>
           </section>
 
           <section className="doc-card">
@@ -1818,6 +1888,7 @@ Authorization: Bearer YOUR_API_KEY`,
               <GithubIcon />
             </a>
           </div>
+          {flashNotice && loaded ? <div className={`toast-banner toast-banner--${flashNotice.type}`.trim()}>{flashNotice.message}</div> : null}
           {loadError && loaded ? <div className="toast-error">{loadError}</div> : null}
           {!loaded ? <section className="section-card active"><div className="panel"><p className="empty">Loading...</p></div></section> : renderContent()}
         </main>
@@ -1827,7 +1898,7 @@ Authorization: Bearer YOUR_API_KEY`,
         title={modalState?.title || ''}
         message={modalState?.message || ''}
         confirmLabel={modalState?.confirmLabel || tr('created_task_modal_confirm')}
-        cancelLabel={modalState?.cancelLabel || tr('created_task_modal_cancel')}
+        cancelLabel={modalState?.cancelLabel}
         onConfirm={() => closeModal(true)}
         onCancel={() => closeModal(false)}
       />

@@ -43,7 +43,7 @@ export function Modal({ open, title, message, confirmLabel, cancelLabel, onConfi
         <h3 id="modal-title">{title}</h3>
         <p className="subtle">{message}</p>
         <div className="modal-actions">
-          <button type="button" className="ghost-btn" onClick={onCancel}>{cancelLabel}</button>
+          {cancelLabel ? <button type="button" className="ghost-btn" onClick={onCancel}>{cancelLabel}</button> : null}
           <button type="button" onClick={onConfirm}>{confirmLabel}</button>
         </div>
       </div>
