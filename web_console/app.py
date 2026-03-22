@@ -44,7 +44,7 @@ PLATFORMS = {
         "requires_captcha_credential": False,
         "supports_proxy": True,
         "default_concurrency": 1,
-        "notes": "Uses GPTMail via the chatgpt_register_v2 mail adapter and writes account/token files into the task directory.",
+        "notes": "Uses the configured mail provider via the chatgpt_register_v2 mail adapter and writes account/token files into the task directory.",
     },
     "grok-register": {
         "label": "Grok Register",
@@ -55,6 +55,9 @@ PLATFORMS = {
         "notes": "Uses YesCaptcha. The worker feeds the original CLI with a concurrency value via stdin.",
     },
 }
+
+EMAIL_CREDENTIAL_KINDS = {"gptmail", "moemail", "cloudflare_temp_email"}
+SUPPORTED_CREDENTIAL_KINDS = EMAIL_CREDENTIAL_KINDS | {"yescaptcha"}
 
 UI_TRANSLATIONS = {
     "zh-CN": {
@@ -84,8 +87,8 @@ UI_TRANSLATIONS = {
         "close_sidebar": "关闭侧边栏",
         "section_overview": "总览与默认配置",
         "panel_defaults_title": "默认设置",
-        "panel_defaults_desc": "API 创建任务时会优先使用这里的默认凭据和默认代理。",
-        "default_gptmail": "默认 GPTMail",
+        "panel_defaults_desc": "API 创建任务时会优先使用这里的默认邮件凭据、默认验证码凭据和默认代理。",
+        "default_gptmail": "默认邮件凭据",
         "default_yescaptcha": "默认 YesCaptcha",
         "default_proxy": "默认代理",
         "save_defaults": "保存默认设置",
@@ -93,21 +96,35 @@ UI_TRANSLATIONS = {
         "panel_recent_tasks_desc": "点任意任务可直接跳到详情页查看控制台输出。",
         "section_credentials": "凭据管理",
         "credentials_create_title": "新增凭据",
-        "credentials_create_desc": "支持 GPTMail 与 YesCaptcha，保存后可直接设为默认。",
+        "credentials_create_desc": "支持 GPTMail、MoeMail、Cloudflare Temp Email 与 YesCaptcha，保存后可直接设为默认。",
         "gptmail_optional_hint": "GPTMail 的 Base URL、邮箱前缀、邮箱域名都有默认值，可直接留空不填写。",
+        "moemail_optional_hint": "MoeMail 需要站点 Base URL 和 API Key，邮箱前缀与域名可按需填写。",
+        "cloudflare_optional_hint": "Cloudflare Temp Email 需要 Worker Base URL 和管理员访问密码；如果站点启用了全局访问密码，也可以一并填写。",
         "credentials_saved_title": "已保存凭据",
         "credentials_saved_desc": "支持删除、查看备注、设为默认。",
         "field_name": "名称",
         "field_kind": "类型",
         "field_api_key": "API Key",
+        "field_secret": "辅助密钥",
         "field_base_url": "Base URL",
         "field_prefix": "邮箱前缀",
         "field_domain": "邮箱域名",
+        "field_secret_placeholder": "按当前凭据类型填写辅助密钥",
         "field_base_url_placeholder": "留空使用默认 Base URL",
         "field_prefix_placeholder": "留空使用默认邮箱前缀",
         "field_domain_placeholder": "留空使用默认邮箱域名",
         "field_notes": "备注",
         "save_credential": "保存凭据",
+        "credential_kind_gptmail": "GPTMail",
+        "credential_kind_moemail": "MoeMail",
+        "credential_kind_cloudflare_temp_email": "Cloudflare Temp Email",
+        "credential_kind_yescaptcha": "YesCaptcha",
+        "credential_api_key_label_gptmail": "GPTMail API Key",
+        "credential_api_key_label_moemail": "MoeMail API Key",
+        "credential_api_key_label_cloudflare_temp_email": "管理员访问密码",
+        "credential_api_key_label_yescaptcha": "YesCaptcha API Key",
+        "credential_secret_label_cloudflare_temp_email": "站点访问密码",
+        "credential_secret_placeholder_cloudflare_temp_email": "如果部署启用了 x-custom-auth，可在这里填写",
         "section_proxies": "代理管理",
         "proxies_create_title": "新增代理",
         "proxies_create_desc": "支持保存多个代理，并可指定为站点默认代理。",
@@ -168,7 +185,7 @@ UI_TRANSLATIONS = {
         "save_api_key": "生成 API Key",
         "section_docs": "API文档",
         "docs_intro_title": "总览",
-        "docs_intro_desc": "控制台支持网页操作和外部 API 调用。外部 API 默认使用站点中已配置的默认 GPTMail、默认 YesCaptcha 和默认代理。通过 API 创建的任务会在完成 24 小时后自动清理。",
+        "docs_intro_desc": "控制台支持网页操作和外部 API 调用。外部 API 默认使用站点中已配置的默认邮件凭据、默认 YesCaptcha 和默认代理。通过 API 创建的任务会在完成 24 小时后自动清理。",
         "docs_deploy_title": "部署方式",
         "docs_deploy_desc": "推荐优先使用 Docker Compose 部署，默认直接拉取 `maishanhub/mregister:main` 镜像，便于快速上线和保留运行数据；如果只是本地调试，也可以直接用 Python 启动。",
         "docs_local_deploy_title": "本地 Python 启动",
@@ -216,10 +233,10 @@ UI_TRANSLATIONS = {
         "created_at": "创建于 {value}",
         "last_used_at": "最近使用时间 {value}",
         "unused": "暂未使用",
-        "use_default_gptmail": "使用默认 GPTMail",
+        "use_default_gptmail": "使用默认邮件凭据",
         "use_default_yescaptcha": "使用默认 YesCaptcha",
         "choose_proxy": "选择一个代理",
-        "no_default_gptmail": "不设置默认 GPTMail",
+        "no_default_gptmail": "不设置默认邮件凭据",
         "no_default_yescaptcha": "不设置默认 YesCaptcha",
         "no_default_proxy": "不使用默认代理",
         "current_default": "当前默认",
@@ -285,8 +302,8 @@ UI_TRANSLATIONS = {
         "close_sidebar": "Close sidebar",
         "section_overview": "Overview and Defaults",
         "panel_defaults_title": "Default settings",
-        "panel_defaults_desc": "API-created tasks will use these default credentials and proxy settings first.",
-        "default_gptmail": "Default GPTMail",
+        "panel_defaults_desc": "API-created tasks will use these default email credentials, captcha credentials, and proxy settings first.",
+        "default_gptmail": "Default email credential",
         "default_yescaptcha": "Default YesCaptcha",
         "default_proxy": "Default proxy",
         "save_defaults": "Save defaults",
@@ -294,21 +311,35 @@ UI_TRANSLATIONS = {
         "panel_recent_tasks_desc": "Click any task to jump straight into the detail view and console output.",
         "section_credentials": "Credential Management",
         "credentials_create_title": "Add credential",
-        "credentials_create_desc": "Supports GPTMail and YesCaptcha. You can set the saved item as default immediately.",
+        "credentials_create_desc": "Supports GPTMail, MoeMail, Cloudflare Temp Email, and YesCaptcha. You can set the saved item as default immediately.",
         "gptmail_optional_hint": "For GPTMail, Base URL, email prefix, and email domain all have defaults, so you can leave them blank.",
+        "moemail_optional_hint": "MoeMail requires a site Base URL and API Key. Prefix and domain are optional.",
+        "cloudflare_optional_hint": "Cloudflare Temp Email requires the Worker Base URL and admin password. If the site also uses a global access password, fill it in as well.",
         "credentials_saved_title": "Saved credentials",
         "credentials_saved_desc": "Delete, review notes, and set defaults here.",
         "field_name": "Name",
         "field_kind": "Type",
         "field_api_key": "API Key",
+        "field_secret": "Secondary secret",
         "field_base_url": "Base URL",
         "field_prefix": "Email prefix",
         "field_domain": "Email domain",
+        "field_secret_placeholder": "Optional secondary secret for this credential type",
         "field_base_url_placeholder": "Leave blank to use the default Base URL",
         "field_prefix_placeholder": "Leave blank to use the default email prefix",
         "field_domain_placeholder": "Leave blank to use the default email domain",
         "field_notes": "Notes",
         "save_credential": "Save credential",
+        "credential_kind_gptmail": "GPTMail",
+        "credential_kind_moemail": "MoeMail",
+        "credential_kind_cloudflare_temp_email": "Cloudflare Temp Email",
+        "credential_kind_yescaptcha": "YesCaptcha",
+        "credential_api_key_label_gptmail": "GPTMail API Key",
+        "credential_api_key_label_moemail": "MoeMail API Key",
+        "credential_api_key_label_cloudflare_temp_email": "Admin password",
+        "credential_api_key_label_yescaptcha": "YesCaptcha API Key",
+        "credential_secret_label_cloudflare_temp_email": "Site access password",
+        "credential_secret_placeholder_cloudflare_temp_email": "Fill this if the deployment requires x-custom-auth",
         "section_proxies": "Proxy Management",
         "proxies_create_title": "Add proxy",
         "proxies_create_desc": "Save multiple proxies and promote one as the site-wide default.",
@@ -369,7 +400,7 @@ UI_TRANSLATIONS = {
         "save_api_key": "Generate API key",
         "section_docs": "API Docs",
         "docs_intro_title": "总览",
-        "docs_intro_desc": "控制台支持网页操作和外部 API 调用。外部 API 默认使用站点中已配置的默认 GPTMail、默认 YesCaptcha 和默认代理。通过 API 创建的任务会在完成 24 小时后自动清理。",
+        "docs_intro_desc": "The console supports both web operations and external API calls. External API tasks use the configured default email credential, default YesCaptcha credential, and default proxy first. API-created tasks are auto-cleaned 24 hours after completion.",
         "docs_deploy_title": "部署方式",
         "docs_deploy_desc": "推荐优先使用 Docker Compose 部署，默认直接拉取 `maishanhub/mregister:main` 镜像，便于快速上线和保留运行数据；如果只是本地调试，也可以直接用 Python 启动。",
         "docs_local_deploy_title": "本地 Python 启动",
@@ -417,10 +448,10 @@ UI_TRANSLATIONS = {
         "created_at": "Created at {value}",
         "last_used_at": "Last used {value}",
         "unused": "Not used yet",
-        "use_default_gptmail": "Use default GPTMail",
+        "use_default_gptmail": "Use default email credential",
         "use_default_yescaptcha": "Use default YesCaptcha",
         "choose_proxy": "Choose a proxy",
-        "no_default_gptmail": "No default GPTMail",
+        "no_default_gptmail": "No default email credential",
         "no_default_yescaptcha": "No default YesCaptcha",
         "no_default_proxy": "No default proxy",
         "current_default": "Current default",
@@ -536,6 +567,7 @@ def init_db() -> None:
                 name TEXT NOT NULL UNIQUE,
                 kind TEXT NOT NULL,
                 api_key TEXT NOT NULL,
+                secret TEXT,
                 base_url TEXT,
                 prefix TEXT,
                 domain TEXT,
@@ -616,6 +648,13 @@ def init_db() -> None:
                 last_used_at TEXT
             );
             """
+        )
+        ensure_columns(
+            conn,
+            "credentials",
+            {
+                "secret": "TEXT",
+            },
         )
         ensure_columns(
             conn,
@@ -900,8 +939,20 @@ def require_api_key(request: Request) -> sqlite3.Row:
     return row
 
 
-def get_credentials() -> list[dict[str, Any]]:
-    return [row_to_dict(row) for row in fetch_all("SELECT * FROM credentials ORDER BY kind, name")]
+def is_email_credential_kind(kind: str) -> bool:
+    return kind in EMAIL_CREDENTIAL_KINDS
+
+
+def serialize_credential(row: sqlite3.Row, *, include_secrets: bool = False) -> dict[str, Any]:
+    item = row_to_dict(row)
+    if not include_secrets:
+        item.pop("api_key", None)
+        item.pop("secret", None)
+    return item
+
+
+def get_credentials(*, include_secrets: bool = False) -> list[dict[str, Any]]:
+    return [serialize_credential(row, include_secrets=include_secrets) for row in fetch_all("SELECT * FROM credentials ORDER BY kind, name")]
 
 
 def get_proxies() -> list[dict[str, Any]]:
@@ -953,10 +1004,14 @@ def resolve_required_credential(kind: str, credential_id: int | None) -> sqlite3
     defaults = get_defaults()
     selected_id = credential_id
     if selected_id is None:
-        selected_id = defaults["default_gptmail_credential_id"] if kind == "gptmail" else defaults["default_yescaptcha_credential_id"]
+        selected_id = defaults["default_gptmail_credential_id"] if kind == "email" else defaults["default_yescaptcha_credential_id"]
     if selected_id is None:
         raise HTTPException(status_code=400, detail=f"No default {kind} credential is configured")
     credential = get_credential(int(selected_id))
+    if kind == "email":
+        if not is_email_credential_kind(str(credential["kind"])):
+            raise HTTPException(status_code=400, detail=f"Credential {selected_id} is not a supported email credential")
+        return credential
     if credential["kind"] != kind:
         raise HTTPException(status_code=400, detail=f"Credential {selected_id} is not of type {kind}")
     return credential
@@ -1052,6 +1107,7 @@ class CredentialCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     kind: str
     api_key: str = Field(min_length=1)
+    secret: str | None = None
     base_url: str | None = None
     prefix: str | None = None
     domain: str | None = None
@@ -1154,7 +1210,7 @@ def resolve_task_configuration(
     email_row = None
     captcha_row = None
     if spec["requires_email_credential"]:
-        email_row = resolve_required_credential("gptmail", email_credential_id)
+        email_row = resolve_required_credential("email", email_credential_id)
     if spec["requires_captcha_credential"]:
         captcha_row = resolve_required_credential("yescaptcha", captcha_credential_id)
 
@@ -1360,20 +1416,22 @@ class TaskSupervisor:
             credential = get_credential(int(task["email_credential_id"]))
             output_dir = task_dir / "output"
             output_dir.mkdir(parents=True, exist_ok=True)
-            env["MAIL_PROVIDER"] = "gptmail"
-            env["GPTMAIL_API_KEY"] = credential["api_key"]
+            env["MAIL_PROVIDER"] = str(credential["kind"])
+            env["MAIL_API_KEY"] = credential["api_key"]
             env["OUTPUT_FILE"] = str(output_dir / "registered_accounts.txt")
             env["AK_FILE"] = str(output_dir / "ak.txt")
             env["RK_FILE"] = str(output_dir / "rk.txt")
             env["TOKEN_JSON_DIR"] = str(output_dir / "tokens")
             if task["proxy"]:
                 env["PROXY"] = str(task["proxy"])
+            if credential["secret"]:
+                env["MAIL_SECRET"] = credential["secret"]
             if credential["base_url"]:
-                env["GPTMAIL_BASE_URL"] = credential["base_url"]
+                env["MAIL_BASE_URL"] = credential["base_url"]
             if credential["prefix"]:
-                env["GPTMAIL_PREFIX"] = credential["prefix"]
+                env["MAIL_PREFIX"] = credential["prefix"]
             if credential["domain"]:
-                env["GPTMAIL_DOMAIN"] = credential["domain"]
+                env["MAIL_DOMAIN"] = credential["domain"]
             command = [
                 sys.executable,
                 str(ROOT_DIR / "chatgpt_register_v2" / "chatgpt_register_v2.py"),
@@ -1672,8 +1730,8 @@ async def api_state(request: Request) -> JSONResponse:
 @app.post("/api/defaults")
 async def update_defaults(payload: DefaultSettingsPayload, request: Request) -> JSONResponse:
     require_authenticated(request)
-    if payload.default_gptmail_credential_id is not None and get_credential(payload.default_gptmail_credential_id)["kind"] != "gptmail":
-        raise HTTPException(status_code=400, detail="Default GPTMail credential is invalid")
+    if payload.default_gptmail_credential_id is not None and not is_email_credential_kind(str(get_credential(payload.default_gptmail_credential_id)["kind"])):
+        raise HTTPException(status_code=400, detail="Default email credential is invalid")
     if payload.default_yescaptcha_credential_id is not None and get_credential(payload.default_yescaptcha_credential_id)["kind"] != "yescaptcha":
         raise HTTPException(status_code=400, detail="Default YesCaptcha credential is invalid")
     if payload.default_proxy_id is not None:
@@ -1761,18 +1819,21 @@ async def test_cpamc_settings(payload: CpamcSettingsPayload, request: Request) -
 @app.post("/api/credentials")
 async def create_credential(payload: CredentialCreate, request: Request) -> JSONResponse:
     require_authenticated(request)
-    if payload.kind not in {"gptmail", "yescaptcha"}:
+    if payload.kind not in SUPPORTED_CREDENTIAL_KINDS:
         raise HTTPException(status_code=400, detail="Unsupported credential kind")
+    if payload.kind in {"moemail", "cloudflare_temp_email"} and not (payload.base_url or "").strip():
+        raise HTTPException(status_code=400, detail="Base URL is required for this credential type")
     timestamp = now_iso()
     credential_id = execute(
         """
-        INSERT INTO credentials (name, kind, api_key, base_url, prefix, domain, notes, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO credentials (name, kind, api_key, secret, base_url, prefix, domain, notes, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             payload.name.strip(),
             payload.kind,
             payload.api_key.strip(),
+            (payload.secret or "").strip() or None,
             (payload.base_url or "").strip() or None,
             (payload.prefix or "").strip() or None,
             (payload.domain or "").strip() or None,

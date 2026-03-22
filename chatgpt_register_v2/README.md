@@ -1,6 +1,6 @@
 # ChatGPT / Codex 自动注册工具 v2.0
 
-支持 Skymail 与 GPTMail 的 Codex 自动注册与 OAuth Token 生成工具集。
+支持 Skymail、GPTMail、MoeMail 与 Cloudflare Temp Email 的 Codex 自动注册与 OAuth Token 生成工具集。
 
 ## ✨ v2.0 重大更新
 
@@ -21,7 +21,7 @@
 .
 ├── lib/                          # 核心库模块
 │   ├── config.py                 # 配置加载
-│   ├── skymail_client.py         # 邮件客户端工厂（Skymail / GPTMail）
+│   ├── skymail_client.py         # 邮件客户端工厂（Skymail / GPTMail / MoeMail / Cloudflare Temp Email）
 │   ├── gptmail_client.py         # GPTMail API 客户端
 │   ├── chatgpt_client.py         # ChatGPT 注册客户端
 │   ├── oauth_client.py           # OAuth 登录客户端
@@ -35,7 +35,7 @@
 
 ## 功能特性
 
-- 🚀 支持 Skymail 自建邮箱与 GPTMail 临时邮箱
+- 🚀 支持 Skymail 自建邮箱、GPTMail、MoeMail 与 Cloudflare Temp Email
 - 🌐 支持多个域名后缀：在config.json里面配置
 - 🤖 自动注册 ChatGPT 账号并获取验证码
 - 🔑 自动生成 OAuth Token（Access Token / Refresh Token）
@@ -47,8 +47,7 @@
 ## 环境要求
 
 - Python 3.7+
-- Skymail 自建邮箱服务（可选，需要管理员账号）
-- GPTMail API Key（可选，推荐）
+- 邮件服务凭据（可选，支持 GPTMail、MoeMail、Cloudflare Temp Email 或 Skymail）
 - 代理（可选，用于访问 OpenAI 服务）
 
 ## 安装依赖
@@ -63,6 +62,14 @@ pip install curl_cffi
 
 ```json
 {
+    "mail_provider": "gptmail",
+    "mail_base_url": "https://mail.chatgpt.org.uk",
+    "mail_api_key": "your_mail_api_key_here",
+    "mail_prefix": "",
+    "mail_domain": "",
+    "mail_secret": "",
+    "mail_timeout": 30,
+    "mail_expiry_time": 3600000,
     "skymail_admin_email": "admin@example.com",
     "skymail_admin_password": "your_password_here",
     "skymail_domains": [],
@@ -83,23 +90,30 @@ pip install curl_cffi
 ### 重要配置项说明
 
 1. **mail_provider**：
-   - 可选 `skymail` 或 `gptmail`
-   - 推荐使用 `gptmail`
+   - 可选 `skymail`、`gptmail`、`moemail`、`cloudflare_temp_email`
+   - 推荐优先使用 API 化的邮件服务
 
-2. **gptmail_api_key**：
-   - 当 `mail_provider=gptmail` 时必填
-   - 其余 `gptmail_*` 配置可按需覆盖默认值
+2. **mail_api_key**：
+   - `gptmail` / `moemail` 使用各自 API Key
+   - `cloudflare_temp_email` 使用管理员访问密码
+   - `skymail` 不使用这个字段
 
-3. **skymail_admin_email** 和 **skymail_admin_password**：
+3. **mail_base_url / mail_prefix / mail_domain / mail_secret**：
+   - `mail_base_url`：邮件项目站点根地址
+   - `mail_prefix`：创建邮箱时使用的前缀
+   - `mail_domain`：固定域名，可选
+   - `mail_secret`：Cloudflare Temp Email 站点启用了全局访问密码时填写
+
+4. **skymail_admin_email** 和 **skymail_admin_password**：
    - Skymail 管理员账号
    - API 地址自动从邮箱域名提取
    - 程序启动时自动生成 API Token
 
-4. **proxy**：
+5. **proxy**：
    - 代理地址（可选）
    - 格式：`http://host:port` 或 `socks5://host:port`
 
-5. **enable_oauth** 和 **oauth_required**：
+6. **enable_oauth** 和 **oauth_required**：
    - `enable_oauth`: 是否启用 OAuth 登录
    - `oauth_required`: OAuth 失败时是否视为注册失败
 
@@ -175,9 +189,10 @@ python chatgpt_register_v2.py -n 10 -w 5 --no-oauth
 ## 注意事项
 
 ### 1. 邮件服务
-- 使用 GPTMail 时，只需要有效的 API Key
+- 使用 GPTMail / MoeMail 时，只需要有效的 API Key
+- 使用 Cloudflare Temp Email 时，需要 Worker Base URL 和管理员访问密码
 - 使用 Skymail 时，需要自己搭建服务并配置管理员账号
-- 两种方式都不会改变主注册流程，只替换邮箱生成和收码实现
+- 这些方式都不会改变主注册流程，只替换邮箱生成和收码实现
 
 ### 2. 代理设置
 - 如果在国内使用，建议配置代理

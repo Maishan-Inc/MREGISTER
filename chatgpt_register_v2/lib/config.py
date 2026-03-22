@@ -12,6 +12,13 @@ def load_config():
         "total_accounts": 3,
         "concurrent_workers": 1,
         "mail_provider": "skymail",
+        "mail_base_url": "",
+        "mail_api_key": "",
+        "mail_prefix": "",
+        "mail_domain": "",
+        "mail_secret": "",
+        "mail_timeout": 30,
+        "mail_expiry_time": 3600000,
         "skymail_admin_email": "",
         "skymail_admin_password": "",
         "skymail_domains": [],
@@ -48,6 +55,13 @@ def load_config():
     # 环境变量优先级更高
     env_mappings = {
         "MAIL_PROVIDER": "mail_provider",
+        "MAIL_BASE_URL": "mail_base_url",
+        "MAIL_API_KEY": "mail_api_key",
+        "MAIL_PREFIX": "mail_prefix",
+        "MAIL_DOMAIN": "mail_domain",
+        "MAIL_SECRET": "mail_secret",
+        "MAIL_TIMEOUT": "mail_timeout",
+        "MAIL_EXPIRY_TIME": "mail_expiry_time",
         "SKYMAIL_ADMIN_EMAIL": "skymail_admin_email",
         "SKYMAIL_ADMIN_PASSWORD": "skymail_admin_password",
         "GPTMAIL_BASE_URL": "gptmail_base_url",
@@ -76,8 +90,10 @@ def load_config():
         if env_value is not None:
             if config_key in ["total_accounts", "concurrent_workers"]:
                 config[config_key] = int(env_value)
-            elif config_key in ["gptmail_timeout"]:
+            elif config_key in ["mail_timeout", "gptmail_timeout"]:
                 config[config_key] = float(env_value)
+            elif config_key in ["mail_expiry_time"]:
+                config[config_key] = int(env_value)
             elif config_key in ["enable_oauth", "oauth_required"]:
                 config[config_key] = env_value.lower() in ["1", "true", "yes", "y", "on"]
             else:

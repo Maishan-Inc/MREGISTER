@@ -7,6 +7,7 @@ import {
   getPlatformKeys,
   getTaskDisplayName,
   initialTaskDraft,
+  isEmailCredentialKind,
   isMobileLayout,
   normalizeTaskDraft,
   parseIntOrNull,
@@ -42,6 +43,41 @@ function normalizeStatePayload(payload) {
     cpamc: payload.cpamc || {},
     dashboard: payload.dashboard || {},
     platforms: payload.platforms || {},
+  };
+}
+
+function credentialKindLabel(kind) {
+  const keyMap = {
+    gptmail: 'credential_kind_gptmail',
+    moemail: 'credential_kind_moemail',
+    cloudflare_temp_email: 'credential_kind_cloudflare_temp_email',
+    yescaptcha: 'credential_kind_yescaptcha',
+  };
+  return tr(keyMap[kind] || kind);
+}
+
+function getCredentialFieldMeta(kind) {
+  const isEmail = isEmailCredentialKind(kind);
+  return {
+    isEmail,
+    showSecret: kind === 'cloudflare_temp_email',
+    apiKeyLabel: tr({
+      gptmail: 'credential_api_key_label_gptmail',
+      moemail: 'credential_api_key_label_moemail',
+      cloudflare_temp_email: 'credential_api_key_label_cloudflare_temp_email',
+      yescaptcha: 'credential_api_key_label_yescaptcha',
+    }[kind] || 'field_api_key'),
+    hint: kind === 'gptmail'
+      ? tr('gptmail_optional_hint')
+      : kind === 'moemail'
+        ? tr('moemail_optional_hint')
+        : kind === 'cloudflare_temp_email'
+          ? tr('cloudflare_optional_hint')
+          : '',
+    secretLabel: kind === 'cloudflare_temp_email' ? tr('credential_secret_label_cloudflare_temp_email') : tr('field_secret'),
+    secretPlaceholder: kind === 'cloudflare_temp_email'
+      ? tr('credential_secret_placeholder_cloudflare_temp_email')
+      : tr('field_secret_placeholder'),
   };
 }
 
@@ -151,7 +187,7 @@ function getDocsContent(uiLang, apiBaseUrl) {
       firstUseSteps: [
         '阅读并确认 Maishan Inc. 非商业性协议。',
         '设置管理员密码并进入后台。',
-        '在“凭据”页面添加 GPTMail 凭据。',
+        '在“凭据”页面添加邮件凭据（GPTMail、MoeMail 或 Cloudflare Temp Email）。',
         '如需使用 grok-register，再添加 YesCaptcha 凭据。',
         '如需固定出口，在“代理”页面添加代理并设置默认值。',
         '在“API”页面创建 API Key，供外部程序调用。',
@@ -245,7 +281,7 @@ Authorization: Bearer YOUR_API_KEY`,
     firstUseSteps: [
       'Read and accept the Maishan Inc. non-commercial agreement.',
       'Set the admin password.',
-      'Add a GPTMail credential.',
+        'Add an email credential (GPTMail, MoeMail, or Cloudflare Temp Email).',
       'Add a YesCaptcha credential if you plan to use grok-register.',
       'Add and optionally set a default proxy.',
       'Create an API key for external integrations.',
@@ -347,6 +383,7 @@ export function ConsoleApp() {
     name: '',
     kind: 'gptmail',
     api_key: '',
+    secret: '',
     base_url: '',
     prefix: '',
     domain: '',
@@ -377,13 +414,14 @@ export function ConsoleApp() {
   const modalResolverRef = useRef(null);
   const consoleRef = useRef(null);
 
-  const mailCredentials = statePayload.credentials.filter((item) => item.kind === 'gptmail');
+  const mailCredentials = statePayload.credentials.filter((item) => isEmailCredentialKind(item.kind));
   const captchaCredentials = statePayload.credentials.filter((item) => item.kind === 'yescaptcha');
   const filteredTasks = taskFilterStatus === 'all'
     ? statePayload.tasks
     : statePayload.tasks.filter((task) => task.status === taskFilterStatus);
   const visibleTask = filteredTasks.find((item) => item.id === selectedTaskId) || filteredTasks[0] || null;
   const currentPlatformSpec = statePayload.platforms[taskDraft.platform] || {};
+  const credentialFieldMeta = getCredentialFieldMeta(credentialDraft.kind);
   const currentSectionLabel = tr(SECTION_TITLE_KEYS[activeSection] || 'section_overview');
   const topbarBreadcrumbs = [
     tr('topbar_workspace'),
@@ -533,9 +571,10 @@ export function ConsoleApp() {
         method: 'POST',
         body: JSON.stringify({
           ...credentialDraft,
-          base_url: credentialDraft.kind === 'gptmail' ? credentialDraft.base_url || null : null,
-          prefix: credentialDraft.kind === 'gptmail' ? credentialDraft.prefix || null : null,
-          domain: credentialDraft.kind === 'gptmail' ? credentialDraft.domain || null : null,
+          secret: credentialDraft.kind === 'cloudflare_temp_email' ? credentialDraft.secret || null : null,
+          base_url: isEmailCredentialKind(credentialDraft.kind) ? credentialDraft.base_url || null : null,
+          prefix: isEmailCredentialKind(credentialDraft.kind) ? credentialDraft.prefix || null : null,
+          domain: isEmailCredentialKind(credentialDraft.kind) ? credentialDraft.domain || null : null,
           notes: credentialDraft.notes || null,
         }),
       });
@@ -543,6 +582,7 @@ export function ConsoleApp() {
         name: '',
         kind: 'gptmail',
         api_key: '',
+        secret: '',
         base_url: '',
         prefix: '',
         domain: '',
@@ -889,20 +929,23 @@ export function ConsoleApp() {
               <label className="field-card">
                 <span>{tr('field_kind')}</span>
                 <select value={credentialDraft.kind} onChange={(event) => setCredentialDraft((current) => ({ ...current, kind: event.target.value }))}>
-                  <option value="gptmail">GPTMail</option>
-                  <option value="yescaptcha">YesCaptcha</option>
+                  <option value="gptmail">{credentialKindLabel('gptmail')}</option>
+                  <option value="moemail">{credentialKindLabel('moemail')}</option>
+                  <option value="cloudflare_temp_email">{credentialKindLabel('cloudflare_temp_email')}</option>
+                  <option value="yescaptcha">{credentialKindLabel('yescaptcha')}</option>
                 </select>
               </label>
               <label className="field-card">
-                <span>{tr('field_api_key')}</span>
+                <span>{credentialFieldMeta.apiKeyLabel}</span>
                 <input required value={credentialDraft.api_key} onChange={(event) => setCredentialDraft((current) => ({ ...current, api_key: event.target.value }))} />
               </label>
-              {credentialDraft.kind === 'gptmail' ? (
+              {credentialFieldMeta.hint ? (
                 <>
-                  <p className="field-tip field-tip--soft">{tr('gptmail_optional_hint')}</p>
+                  <p className="field-tip field-tip--soft">{credentialFieldMeta.hint}</p>
                   <label className="field-card">
                     <span>{tr('field_base_url')}</span>
                     <input
+                      required={credentialDraft.kind !== 'gptmail' && credentialFieldMeta.isEmail}
                       value={credentialDraft.base_url}
                       placeholder={tr('field_base_url_placeholder')}
                       onChange={(event) => setCredentialDraft((current) => ({ ...current, base_url: event.target.value }))}
@@ -926,6 +969,16 @@ export function ConsoleApp() {
                   </label>
                 </>
               ) : null}
+              {credentialFieldMeta.showSecret ? (
+                <label className="field-card">
+                  <span>{credentialFieldMeta.secretLabel}</span>
+                  <input
+                    value={credentialDraft.secret}
+                    placeholder={credentialFieldMeta.secretPlaceholder}
+                    onChange={(event) => setCredentialDraft((current) => ({ ...current, secret: event.target.value }))}
+                  />
+                </label>
+              ) : null}
               <label className="field-card">
                 <span>{tr('field_notes')}</span>
                 <textarea rows="3" value={credentialDraft.notes} onChange={(event) => setCredentialDraft((current) => ({ ...current, notes: event.target.value }))} />
@@ -942,15 +995,15 @@ export function ConsoleApp() {
             </div>
             <div className="entity-list">
               {statePayload.credentials.length ? statePayload.credentials.map((item) => {
-                const isDefault = item.kind === 'gptmail'
+                const isDefault = isEmailCredentialKind(item.kind)
                   ? statePayload.defaults.default_gptmail_credential_id === item.id
                   : statePayload.defaults.default_yescaptcha_credential_id === item.id;
-                const defaultKey = item.kind === 'gptmail' ? 'default_gptmail_credential_id' : 'default_yescaptcha_credential_id';
+                const defaultKey = isEmailCredentialKind(item.kind) ? 'default_gptmail_credential_id' : 'default_yescaptcha_credential_id';
                 return (
                   <article className="entity-card" key={item.id}>
                     <div>
                       <h3>{item.name}</h3>
-                      <p className="meta">{item.kind} | {tr('created_at', { value: item.created_at })}{isDefault ? ` | ${tr('default_badge')}` : ''}</p>
+                      <p className="meta">{credentialKindLabel(item.kind)} | {tr('created_at', { value: item.created_at })}{isDefault ? ` | ${tr('default_badge')}` : ''}</p>
                       <p className="notes">{item.notes || ''}</p>
                     </div>
                     <div className="entity-actions">

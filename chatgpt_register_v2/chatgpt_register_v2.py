@@ -143,11 +143,18 @@ def main():
     if args.no_oauth:
         config["enable_oauth"] = False
 
-    mail_provider = str(config.get("mail_provider", "skymail")).strip().lower() or "skymail"
+    mail_provider = str(config.get("mail_provider", "skymail")).strip().lower().replace("-", "_") or "skymail"
+    mail_provider_labels = {
+        "gptmail": "GPTMail",
+        "moemail": "MoeMail",
+        "cloudflare_temp_email": "Cloudflare Temp Email",
+        "skymail": "Skymail",
+    }
+    mail_provider_label = mail_provider_labels.get(mail_provider, mail_provider)
 
     print("=" * 60)
     print("  ChatGPT 批量自动注册工具 v2.0 (模块化版本)")
-    print("  使用 GPTMail 临时邮箱" if mail_provider == "gptmail" else "  使用 Skymail 临时邮箱")
+    print(f"  使用 {mail_provider_label} 邮件服务")
     print("=" * 60)
 
     total_accounts = args.num

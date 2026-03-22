@@ -32,7 +32,7 @@
 - `openai-register/`
   - OpenAI 注册脚本
 - `chatgpt_register_v2/`
-  - ChatGPT 注册脚本（支持 GPTMail 适配）
+  - ChatGPT 注册脚本（支持 GPTMail、MoeMail、Cloudflare Temp Email 适配）
 - `grok-register/`
   - Grok 注册脚本
 - `docker-compose.yml`
@@ -44,7 +44,7 @@
 - 创建任务、排队执行、停止任务
 - 查看实时日志与历史日志
 - 下载任务结果压缩包
-- 管理 GPTMail、YesCaptcha、代理
+- 管理邮件凭据、YesCaptcha、代理
 - 定时任务
 - 通过 API Key 调用外部任务接口
 - SQLite 持久化保存配置与任务记录
@@ -55,7 +55,7 @@
 
 - 已安装 Python 3.12 或 Docker / Docker Compose
 - 服务器可以访问外部网络
-- 已准备好 GPTMail API Key
+- 已准备好可用的邮件服务凭据（例如 GPTMail API Key、MoeMail API Key 或 Cloudflare Temp Email 管理密码）
 - 如需 `grok-register`，准备好 YesCaptcha Key
 - 如需代理，提前确认代理出口可用
 
@@ -163,7 +163,7 @@ docker compose down
 1. 首次打开页面，阅读 Maishan Inc. 非商业协议并滚动到底部
 2. 点击“下一步”后，手动输入“我同意此条款”
 3. 设置管理员密码并进入后台
-4. 进入“凭据”页面，新增 GPTMail 凭据
+4. 进入“凭据”页面，新增邮件凭据（GPTMail、MoeMail 或 Cloudflare Temp Email）
 5. 如需 `grok-register`，再新增 YesCaptcha 凭据
 6. 如需固定出口，进入“代理”页面新增代理并可设置默认代理
 7. 进入“API”页面创建一个 API Key
@@ -172,7 +172,7 @@ docker compose down
 如果你只打算通过 API 调用任务，最少要完成下面两步：
 
 - 设置管理员密码
-- 创建默认 GPTMail 凭据，并生成 API Key
+- 创建默认邮件凭据，并生成 API Key
 
 ## API 调用流程
 
