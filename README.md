@@ -1,7 +1,7 @@
 # MREGISTER 控制台说明 OPENAI 注册暂时无法使用 正在寻求新方法 
 
 
-`MREGISTER` 是一个基于 FastAPI 的控制台，用来统一管理 `openai-register` 和 `grok-register` 两个注册脚本。它把原本偏命令行的执行方式包装成可持久化、可排队、可下载结果、可通过 API 调用的任务系统。
+`MREGISTER` 是一个基于 FastAPI 的控制台，用来统一管理 `openai-register`、`chatgpt_register_v2` 和 `grok-register` 三个注册脚本。它把原本偏命令行的执行方式包装成可持久化、可排队、可下载结果、可通过 API 调用的任务系统。
 
 本文档只保留中文，并重点说明：
 
@@ -32,6 +32,8 @@
   - Dockerfile
 - `openai-register/`
   - OpenAI 注册脚本
+- `chatgpt_register_v2/`
+  - ChatGPT 注册脚本（支持 GPTMail 适配）
 - `grok-register/`
   - Grok 注册脚本
 - `docker-compose.yml`
@@ -222,7 +224,7 @@ Authorization: Bearer YOUR_API_KEY
 
 字段说明：
 
-- `platform`：任务平台，当前支持 `openai-register`、`grok-register`
+- `platform`：任务平台，当前支持 `openai-register`、`chatgpt-register-v2`、`grok-register`
 - `quantity`：目标成功数量
 - `use_proxy`：是否使用默认代理，`true` 表示使用，`false` 表示不使用
 - `concurrency`：并发数，默认 `1`

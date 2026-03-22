@@ -44,13 +44,13 @@ PLATFORMS = {
         "default_concurrency": 1,
         "notes": "Uses GPTMail and writes token/account files into the task directory.",
     },
-    "openai-register-bate-L": {
-        "label": "OpenAl Register L临时版本",
+    "chatgpt-register-v2": {
+        "label": "ChatGPT Register v2",
         "requires_email_credential": True,
         "requires_captcha_credential": False,
         "supports_proxy": True,
         "default_concurrency": 1,
-        "notes": "Uses GPTMail and writes token/account files into the task directory.",
+        "notes": "Uses GPTMail via the chatgpt_register_v2 mail adapter and writes account/token files into the task directory.",
     },
     "grok-register": {
         "label": "Grok Register",
@@ -182,7 +182,7 @@ UI_TRANSLATIONS = {
         "endpoint_download_desc": "下载任务结果压缩包",
         "required_yes": "是",
         "required_no": "否",
-        "param_platform_desc": "驱动名称，目前支持 `openai-register`、`openai-register-bate-L` 和 `grok-register`",
+        "param_platform_desc": "驱动名称，目前支持 `openai-register`、`chatgpt-register-v2` 和 `grok-register`",
         "param_quantity_desc": "目标成功数量，系统按真实成功数判断完成，不按尝试次数计算",
         "param_use_proxy_desc": "是否启用默认代理，不传或传 false 表示不使用代理",
         "param_concurrency_desc": "并发数，默认 1",
@@ -366,7 +366,7 @@ UI_TRANSLATIONS = {
         "endpoint_download_desc": "下载任务结果压缩包",
         "required_yes": "Yes",
         "required_no": "No",
-        "param_platform_desc": "Driver name. Supported values: `openai-register`, `openai-register-bate-L`, and `grok-register`",
+        "param_platform_desc": "Driver name. Supported values: `openai-register`, `chatgpt-register-v2`, and `grok-register`",
         "param_quantity_desc": "目标成功数量，系统按真实成功数判断完成，不按尝试次数计算",
         "param_use_proxy_desc": "是否启用默认代理，不传或传 false 表示不使用代理",
         "param_concurrency_desc": "并发数，默认 1",
@@ -834,8 +834,10 @@ def resolve_proxy_value(proxy_mode: str, proxy_id: int | None) -> str | None:
 
 def task_paths(task: sqlite3.Row | dict[str, Any]) -> dict[str, Path]:
     task_dir = Path(task["task_dir"])
-    if task["platform"] in {"openai-register", "openai-register-bate-L"}:
+    if task["platform"] == "openai-register":
         results_file = task_dir / "output" / "tokens" / "accounts.txt"
+    elif task["platform"] == "chatgpt-register-v2":
+        results_file = task_dir / "output" / "registered_accounts.txt"
     else:
         results_file = task_dir / "keys" / "accounts.txt"
     archive_path = Path(task["archive_path"]) if task["archive_path"] else task_dir / "task_result.zip"
@@ -1178,7 +1180,7 @@ class TaskSupervisor:
         env["PYTHONUNBUFFERED"] = "1"
         stdin_payload: str | None = None
 
-        if task["platform"] in {"openai-register", "openai-register-bate-L"}:
+        if task["platform"] == "openai-register":
             credential = get_credential(int(task["email_credential_id"]))
             env["GPTMAIL_API_KEY"] = credential["api_key"]
             if credential["base_url"]:
@@ -1187,10 +1189,9 @@ class TaskSupervisor:
                 env["GPTMAIL_PREFIX"] = credential["prefix"]
             if credential["domain"]:
                 env["GPTMAIL_DOMAIN"] = credential["domain"]
-            script_dir = "openai-register-bate-L" if task["platform"] == "openai-register-bate-L" else "openai-register"
             command = [
                 sys.executable,
-                str(ROOT_DIR / script_dir / "openai_register.py"),
+                str(ROOT_DIR / "openai-register" / "openai_register.py"),
                 "--output-dir",
                 str(task_dir / "output"),
                 "--sleep-min",
@@ -1200,7 +1201,34 @@ class TaskSupervisor:
             ]
             if task["proxy"]:
                 command.extend(["--proxy", str(task["proxy"])])
-            cwd = ROOT_DIR / script_dir
+            cwd = ROOT_DIR / "openai-register"
+        elif task["platform"] == "chatgpt-register-v2":
+            credential = get_credential(int(task["email_credential_id"]))
+            output_dir = task_dir / "output"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            env["MAIL_PROVIDER"] = "gptmail"
+            env["GPTMAIL_API_KEY"] = credential["api_key"]
+            env["OUTPUT_FILE"] = str(output_dir / "registered_accounts.txt")
+            env["AK_FILE"] = str(output_dir / "ak.txt")
+            env["RK_FILE"] = str(output_dir / "rk.txt")
+            env["TOKEN_JSON_DIR"] = str(output_dir / "tokens")
+            if task["proxy"]:
+                env["PROXY"] = str(task["proxy"])
+            if credential["base_url"]:
+                env["GPTMAIL_BASE_URL"] = credential["base_url"]
+            if credential["prefix"]:
+                env["GPTMAIL_PREFIX"] = credential["prefix"]
+            if credential["domain"]:
+                env["GPTMAIL_DOMAIN"] = credential["domain"]
+            command = [
+                sys.executable,
+                str(ROOT_DIR / "chatgpt_register_v2" / "chatgpt_register_v2.py"),
+                "-n",
+                str(int(task["quantity"])),
+                "-w",
+                str(int(task["concurrency"])),
+            ]
+            cwd = ROOT_DIR / "chatgpt_register_v2"
         elif task["platform"] == "grok-register":
             credential = get_credential(int(task["captcha_credential_id"]))
             env["YESCAPTCHA_KEY"] = credential["api_key"]
