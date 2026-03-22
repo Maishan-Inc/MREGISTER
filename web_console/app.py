@@ -236,6 +236,7 @@ UI_TRANSLATIONS = {
         "enable": "启用",
         "disable": "停用",
         "stop_task": "停止任务",
+        "run_schedule_now": "立即执行",
         "download_zip": "下载压缩包",
         "delete_task": "删除任务",
         "save_now": "新建成功，请立即保存",
@@ -276,6 +277,7 @@ UI_TRANSLATIONS = {
         "schedule_runs_short": "次已完成",
         "schedule_today_detail_title": "今日任务",
         "schedule_latest_task_title": "最近一次执行",
+        "schedule_console_empty": "今日暂无控制台输出",
         "api_key_meta": "{prefix}... | 创建于 {created_at}",
     },
     "en": {
@@ -457,6 +459,7 @@ UI_TRANSLATIONS = {
         "enable": "Enable",
         "disable": "Disable",
         "stop_task": "Stop task",
+        "run_schedule_now": "Run now",
         "download_zip": "Download archive",
         "delete_task": "Delete task",
         "save_now": "Created successfully, save it now",
@@ -497,6 +500,7 @@ UI_TRANSLATIONS = {
         "schedule_runs_short": "runs done",
         "schedule_today_detail_title": "Today's Run",
         "schedule_latest_task_title": "Latest Run",
+        "schedule_console_empty": "No console output for today's run yet",
         "api_key_meta": "{prefix}... | Created at {created_at}",
     },
 }
@@ -1369,6 +1373,34 @@ def insert_task(*, name: str, config: TaskResolvedConfig) -> int:
     return task_id
 
 
+def create_task_from_schedule(schedule: sqlite3.Row, *, update_last_run_date: bool) -> int:
+    quantity = int(schedule["quantity"])
+    concurrency = int(schedule["concurrency"])
+    proxy_mode = "default" if int(schedule["use_proxy"] or 0) else "none"
+    schedule_name = f"{schedule['name']} {now().strftime('%Y-%m-%d %H:%M:%S')}"
+    _, config = resolve_task_configuration(
+        name=schedule_name,
+        platform=str(schedule["platform"]),
+        quantity=quantity,
+        concurrency=concurrency,
+        email_credential_id=None,
+        captcha_credential_id=None,
+        proxy_mode=proxy_mode,
+        proxy_id=None,
+        source="schedule",
+        schedule_id=int(schedule["id"]),
+        cpamc_auto_import=bool(schedule["auto_import_cpamc"]),
+        auto_delete_at=None,
+    )
+    task_id = insert_task(name=schedule_name, config=config)
+    if update_last_run_date:
+        execute_no_return(
+            "UPDATE schedules SET last_run_date = ?, updated_at = ? WHERE id = ?",
+            (now().strftime("%Y-%m-%d"), now_iso(), int(schedule["id"])),
+        )
+    return task_id
+
+
 @dataclass
 class ManagedProcess:
     task_id: int
@@ -1603,29 +1635,7 @@ class TaskSupervisor:
             if schedule["last_run_date"] == today:
                 continue
             try:
-                quantity = int(schedule["quantity"])
-                concurrency = int(schedule["concurrency"])
-                proxy_mode = "default" if int(schedule["use_proxy"] or 0) else "none"
-                schedule_name = f"{schedule['name']} {today}"
-                _, config = resolve_task_configuration(
-                    name=schedule_name,
-                    platform=str(schedule["platform"]),
-                    quantity=quantity,
-                    concurrency=concurrency,
-                    email_credential_id=None,
-                    captcha_credential_id=None,
-                    proxy_mode=proxy_mode,
-                    proxy_id=None,
-                    source="schedule",
-                    schedule_id=int(schedule["id"]),
-                    cpamc_auto_import=bool(schedule["auto_import_cpamc"]),
-                    auto_delete_at=None,
-                )
-                insert_task(name=schedule_name, config=config)
-                execute_no_return(
-                    "UPDATE schedules SET last_run_date = ?, updated_at = ? WHERE id = ?",
-                    (today, now_iso(), int(schedule["id"])),
-                )
+                create_task_from_schedule(schedule, update_last_run_date=True)
             except Exception as exc:
                 print(f"[web-console] schedule {schedule['id']} failed: {exc}")
 
@@ -2118,6 +2128,14 @@ async def toggle_schedule(schedule_id: int, request: Request) -> JSONResponse:
     next_value = 0 if int(row["enabled"]) else 1
     execute_no_return("UPDATE schedules SET enabled = ?, updated_at = ? WHERE id = ?", (next_value, now_iso(), schedule_id))
     return JSONResponse({"ok": True})
+
+
+@app.post("/api/schedules/{schedule_id}/run")
+async def run_schedule_now(schedule_id: int, request: Request) -> JSONResponse:
+    require_authenticated(request)
+    row = get_schedule(schedule_id)
+    task_id = create_task_from_schedule(row, update_last_run_date=False)
+    return JSONResponse({"ok": True, "id": task_id})
 
 
 @app.delete("/api/schedules/{schedule_id}")

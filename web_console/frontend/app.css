@@ -766,7 +766,6 @@ button.ghost-btn.is-busy::after,
 .task-detail-note { margin: 8px 0 0; max-width: 720px; }
 .task-empty { padding: 12px 0; }
 .schedule-detail-layout { display: grid; gap: 18px; }
-.schedule-detail-panels { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 .schedule-summary-card {
   min-width: min(320px, 100%);
@@ -1099,7 +1098,6 @@ pre {
   .admin-shell { grid-template-columns: minmax(0, 1fr); }
   .docs-grid { grid-template-columns: minmax(0, 1fr); }
   .doc-feature { grid-template-columns: minmax(0, 1fr); }
-  .schedule-detail-panels { grid-template-columns: minmax(0, 1fr); }
   .sidebar {
     position: fixed;
     left: 0;

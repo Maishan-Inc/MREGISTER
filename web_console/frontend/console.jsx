@@ -848,6 +848,14 @@ export function ConsoleApp() {
     });
   }
 
+  async function handleRunScheduleNow(item) {
+    await withBusy(`schedule-run-${item.id}`, async () => {
+      const result = await api(`/api/schedules/${item.id}/run`, { method: 'POST' });
+      setSelectedTaskId(Number(result.id));
+      await refreshState();
+    });
+  }
+
   async function handleDeleteSchedule(item) {
     if (!await confirmAction({
       title: tr('delete'),
@@ -1306,43 +1314,25 @@ export function ConsoleApp() {
               </>
             ) : taskListMode === 'schedule' && visibleSchedule ? (
               <div className="schedule-detail-layout">
-                <div className="task-detail-header task-detail-header--split">
+                <div className="task-detail-header">
                   <div className="task-detail-header-main">
                     <h3>{visibleSchedule.name} {tr('schedule_tag_suffix')} (#{visibleSchedule.id})</h3>
                     <p className="meta">
-                      {visibleSchedule.platform} | {tr('field_time_of_day')} {visibleSchedule.time_of_day} | {visibleSchedule.enabled ? tr('enable') : tr('disable')}
+                      {visibleSchedule.platform} | {tr('schedule_target_quantity', { value: visibleSchedule.quantity })} | {tr('schedule_completed_quantity', { value: scheduleDetail?.todayTask?.results_count ?? 0 })} | {tr('schedule_today_status', { value: scheduleDetail?.todayTask ? statusLabel(scheduleDetail.todayTask.status) : tr('schedule_today_none') })}
+                    </p>
+                    <p className="notes">
+                      {tr('schedule_completed_runs', { value: scheduleDetail?.completedRuns ?? 0 })} | {visibleSchedule.use_proxy ? tr('schedule_proxy_on') : tr('schedule_proxy_off')} | {visibleSchedule.auto_import_cpamc ? tr('schedule_cpamc_auto_import_on') : tr('schedule_cpamc_auto_import_off')}
                     </p>
                   </div>
-                  <aside className="schedule-summary-card">
-                    <strong>{tr('schedule_detail_title')}</strong>
-                    <div className="schedule-summary-list">
-                      <span>{visibleSchedule.platform}</span>
-                      <span>{tr('schedule_target_quantity', { value: visibleSchedule.quantity })}</span>
-                      <span>{tr('schedule_completed_quantity', { value: scheduleDetail?.todayTask?.results_count ?? 0 })}</span>
-                      <span>{tr('schedule_today_status', { value: scheduleDetail?.todayTask ? statusLabel(scheduleDetail.todayTask.status) : tr('schedule_today_none') })}</span>
-                      <span>{tr('schedule_completed_runs', { value: scheduleDetail?.completedRuns ?? 0 })}</span>
-                      <span>{visibleSchedule.use_proxy ? tr('schedule_proxy_on') : tr('schedule_proxy_off')}</span>
-                      <span>{visibleSchedule.auto_import_cpamc ? tr('schedule_cpamc_auto_import_on') : tr('schedule_cpamc_auto_import_off')}</span>
-                    </div>
-                  </aside>
                 </div>
-                <div className="schedule-detail-panels">
-                  <article className="panel compact">
-                    <h3>{tr('schedule_today_detail_title')}</h3>
-                    <p className="meta">
-                      {scheduleDetail?.todayTask
-                        ? `${tr('schedule_target_quantity', { value: scheduleDetail.todayTask.quantity })} | ${tr('schedule_completed_quantity', { value: scheduleDetail.todayTask.results_count })} | ${tr('schedule_today_status', { value: statusLabel(scheduleDetail.todayTask.status) })}`
-                        : tr('schedule_today_none')}
-                    </p>
-                  </article>
-                  <article className="panel compact">
-                    <h3>{tr('schedule_latest_task_title')}</h3>
-                    <p className="meta">
-                      {scheduleDetail?.latestTask
-                        ? `#${scheduleDetail.latestTask.id} | ${statusLabel(scheduleDetail.latestTask.status)} | ${scheduleDetail.latestTask.results_count}/${scheduleDetail.latestTask.quantity}`
-                        : tr('empty_tasks')}
-                    </p>
-                  </article>
+                <div className="task-actions">
+                  <BusyButton type="button" busy={isBusy(`schedule-run-${visibleSchedule.id}`)} onClick={() => handleRunScheduleNow(visibleSchedule)}>{tr('run_schedule_now')}</BusyButton>
+                  <BusyButton type="button" busy={isBusy(`schedule-toggle-${visibleSchedule.id}`)} onClick={() => handleToggleSchedule(visibleSchedule)}>{visibleSchedule.enabled ? tr('disable') : tr('enable')}</BusyButton>
+                  <BusyButton type="button" className="danger" busy={isBusy(`schedule-delete-${visibleSchedule.id}`)} onClick={() => handleDeleteSchedule(visibleSchedule)}>{tr('delete')}</BusyButton>
+                </div>
+                <div className="console-box large-console">
+                  <div className="console-title">{tr('console_title')}</div>
+                  <pre>{scheduleDetail?.todayTask?.console_tail || tr('schedule_console_empty')}</pre>
                 </div>
               </div>
             ) : (
