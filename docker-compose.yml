@@ -1,7 +1,7 @@
 services:
   register-console:
     image: maishanhub/mregister:main
-    container_name: register-console
+    container_name: mregister
     ports:
       - "8000:8000"
     environment:
