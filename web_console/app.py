@@ -1498,6 +1498,7 @@ class TaskSupervisor:
         task_dir.mkdir(parents=True, exist_ok=True)
         console_path = paths["console_path"]
         requested = json.loads(task["requested_config_json"])
+        remaining_quantity = max(1, int(task["quantity"]) - count_result_lines(task))
 
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
@@ -1547,7 +1548,7 @@ class TaskSupervisor:
                 sys.executable,
                 str(ROOT_DIR / "chatgpt_register_v2" / "chatgpt_register_v2.py"),
                 "-n",
-                str(int(task["quantity"])),
+                str(remaining_quantity),
                 "-w",
                 str(int(task["concurrency"])),
             ]
@@ -1668,6 +1669,23 @@ class TaskSupervisor:
         quantity = int(row["quantity"])
         current_status = row["status"]
         exit_error = None if exit_code == 0 else f"Task exited with code {exit_code}."
+        if self._should_retry_task(row, results_count):
+            append_task_console(
+                row,
+                f"Current successful results: {results_count}/{quantity}. Re-queueing task to keep running until target is reached.",
+            )
+            execute_no_return(
+                """
+                UPDATE tasks
+                SET status = 'queued',
+                    pid = NULL,
+                    exit_code = NULL,
+                    last_error = NULL
+                WHERE id = ?
+                """,
+                (task_id,),
+            )
+            return
         if results_count >= quantity:
             status = "completed"
             error = None
@@ -1695,6 +1713,14 @@ class TaskSupervisor:
         completed_task = get_task(task_id)
         create_archive(completed_task)
         self._maybe_auto_import_task(completed_task)
+
+    @staticmethod
+    def _should_retry_task(task: sqlite3.Row, results_count: int) -> bool:
+        if str(task["status"]) == "stopping":
+            return False
+        if int(task["quantity"]) <= results_count:
+            return False
+        return str(task["platform"]) == "chatgpt-register-v2"
 
     def _maybe_auto_import_task(self, task: sqlite3.Row) -> None:
         if str(task["status"]) != "completed":

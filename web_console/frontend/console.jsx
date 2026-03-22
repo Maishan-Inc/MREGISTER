@@ -386,9 +386,10 @@ export function ConsoleApp() {
 
   const mailCredentials = statePayload.credentials.filter((item) => item.kind === 'gptmail');
   const captchaCredentials = statePayload.credentials.filter((item) => item.kind === 'yescaptcha');
+  const normalTasks = statePayload.tasks.filter((task) => task.source !== 'schedule');
   const filteredTasks = taskFilterStatus === 'all'
-    ? statePayload.tasks
-    : statePayload.tasks.filter((task) => task.status === taskFilterStatus);
+    ? normalTasks
+    : normalTasks.filter((task) => task.status === taskFilterStatus);
   const visibleTask = filteredTasks.find((item) => item.id === selectedTaskId) || filteredTasks[0] || null;
   const visibleSchedule = statePayload.schedules.find((item) => item.id === selectedScheduleId) || statePayload.schedules[0] || null;
   const currentPlatformSpec = statePayload.platforms[taskDraft.platform] || {};
@@ -833,10 +834,12 @@ export function ConsoleApp() {
     const relatedTasks = statePayload.tasks.filter((item) => Number(item.schedule_id) === Number(schedule.id));
     const todayTask = relatedTasks.find((item) => String(item.created_at || '').startsWith(getTodayDateKey())) || null;
     const latestTask = relatedTasks[0] || null;
+    const importTask = relatedTasks.find((item) => Number(item.cpamc_importable_count || 0) > 0) || null;
     return {
       relatedTasks,
       todayTask,
       latestTask,
+      importTask,
       completedRuns: relatedTasks.filter((item) => item.status === 'completed').length,
     };
   }
@@ -1329,6 +1332,18 @@ export function ConsoleApp() {
                   <BusyButton type="button" busy={isBusy(`schedule-run-${visibleSchedule.id}`)} onClick={() => handleRunScheduleNow(visibleSchedule)}>{tr('run_schedule_now')}</BusyButton>
                   <BusyButton type="button" busy={isBusy(`schedule-toggle-${visibleSchedule.id}`)} onClick={() => handleToggleSchedule(visibleSchedule)}>{visibleSchedule.enabled ? tr('disable') : tr('enable')}</BusyButton>
                   <BusyButton type="button" className="danger" busy={isBusy(`schedule-delete-${visibleSchedule.id}`)} onClick={() => handleDeleteSchedule(visibleSchedule)}>{tr('delete')}</BusyButton>
+                  {statePayload.cpamc?.enabled && statePayload.cpamc?.linked ? (
+                    <BusyButton
+                      type="button"
+                      className="ghost-btn"
+                      busy={isBusy(`cpamc-import-${scheduleDetail?.importTask?.id}`)}
+                      disabled={!scheduleDetail?.importTask}
+                      title={!scheduleDetail?.importTask ? tr('cpamc_import_disabled') : ''}
+                      onClick={() => handleImportTaskToCpamc(scheduleDetail.importTask)}
+                    >
+                      {tr('cpamc_import_button')}
+                    </BusyButton>
+                  ) : null}
                 </div>
                 <div className="console-box large-console">
                   <div className="console-title">{tr('console_title')}</div>
