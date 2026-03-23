@@ -153,6 +153,9 @@ UI_TRANSLATIONS = {
         "task_list_desc": "左侧筛选后只显示对应状态的任务。",
         "task_filter_status": "状态筛选",
         "task_filter_all": "全部状态",
+        "task_list_mode": "列表类型",
+        "task_list_mode_task": "普通任务",
+        "task_list_mode_schedule": "定时任务",
         "console_title": "实时控制台",
         "section_schedules": "定时任务",
         "schedules_create_title": "新增定时任务",
@@ -161,10 +164,13 @@ UI_TRANSLATIONS = {
         "schedules_saved_desc": "可以启用、停用或删除。",
         "field_time_of_day": "执行时间",
         "field_use_default_proxy": "使用默认代理",
+        "field_schedule_auto_import_cpamc": "完成后自动导入到 CPAMC",
         "save_schedule": "保存定时任务",
         "cpamc_title": "配置 CPAMC",
         "cpamc_desc": "用于绑定 CLI Proxy API Management Center，仅处理 Codex / Grok 相关 JSON 导入。",
         "field_cpamc_enabled": "启用 CLI Proxy API Management Center",
+        "field_cpamc_auto_import": "任务完成后自动导入到 CPAMC",
+        "cpamc_auto_import_hint": "全局自动导入和定时任务自动导入共用同一条完成后导入链路，不会重复导入；只在达到目标成功数量后触发。",
         "field_cpamc_base_url": "域名/IP 链接",
         "field_cpamc_base_url_placeholder": "例如 http://127.0.0.1:8317 或 http://127.0.0.1:8317/v0/management",
         "field_cpamc_management_key": "管理密钥",
@@ -249,6 +255,7 @@ UI_TRANSLATIONS = {
         "enable": "启用",
         "disable": "停用",
         "stop_task": "停止任务",
+        "run_schedule_now": "立即执行",
         "download_zip": "下载压缩包",
         "delete_task": "删除任务",
         "save_now": "新建成功，请立即保存",
@@ -277,6 +284,19 @@ UI_TRANSLATIONS = {
         "schedule_meta": "{platform} | 每日 {time} | 数量 {quantity} | {enabled}",
         "schedule_proxy_on": "使用默认代理",
         "schedule_proxy_off": "不使用代理",
+        "schedule_cpamc_auto_import_on": "完成后自动导入 CPAMC",
+        "schedule_cpamc_auto_import_off": "不自动导入 CPAMC",
+        "schedule_detail_title": "定时任务详情",
+        "schedule_target_quantity": "目标数量 {value}",
+        "schedule_completed_quantity": "完成数量 {value}",
+        "schedule_today_status": "今日状态 {value}",
+        "schedule_completed_runs": "已完成 {value} 次定时任务",
+        "schedule_today_none": "今日未触发",
+        "schedule_tag_suffix": "· 定时",
+        "schedule_runs_short": "次已完成",
+        "schedule_today_detail_title": "今日任务",
+        "schedule_latest_task_title": "最近一次执行",
+        "schedule_console_empty": "今日暂无控制台输出",
         "api_key_meta": "{prefix}... | 创建于 {created_at}",
     },
     "en": {
@@ -370,6 +390,9 @@ UI_TRANSLATIONS = {
         "task_list_desc": "The left list only shows tasks that match the selected status filter.",
         "task_filter_status": "Status filter",
         "task_filter_all": "All statuses",
+        "task_list_mode": "List type",
+        "task_list_mode_task": "Normal tasks",
+        "task_list_mode_schedule": "Scheduled tasks",
         "console_title": "Live console",
         "section_schedules": "Schedules",
         "schedules_create_title": "Add schedule",
@@ -378,10 +401,13 @@ UI_TRANSLATIONS = {
         "schedules_saved_desc": "Enable, disable, or delete scheduled tasks here.",
         "field_time_of_day": "Run time",
         "field_use_default_proxy": "Use default proxy",
+        "field_schedule_auto_import_cpamc": "Auto import to CPAMC after completion",
         "save_schedule": "Save schedule",
         "cpamc_title": "Configure CPAMC",
         "cpamc_desc": "Bind CLI Proxy API Management Center here. This is only used for Codex / Grok related JSON imports.",
         "field_cpamc_enabled": "Enable CLI Proxy API Management Center",
+        "field_cpamc_auto_import": "Auto import completed tasks to CPAMC",
+        "cpamc_auto_import_hint": "Global auto import and schedule auto import share the same completion path, so imports are not duplicated and only run after the target success count is reached.",
         "field_cpamc_base_url": "Domain/IP link",
         "field_cpamc_base_url_placeholder": "For example http://127.0.0.1:8317 or http://127.0.0.1:8317/v0/management",
         "field_cpamc_management_key": "Management key",
@@ -466,6 +492,7 @@ UI_TRANSLATIONS = {
         "enable": "Enable",
         "disable": "Disable",
         "stop_task": "Stop task",
+        "run_schedule_now": "Run now",
         "download_zip": "Download archive",
         "delete_task": "Delete task",
         "save_now": "Created successfully, save it now",
@@ -494,6 +521,19 @@ UI_TRANSLATIONS = {
         "schedule_meta": "{platform} | Daily {time} | Quantity {quantity} | {enabled}",
         "schedule_proxy_on": "Use default proxy",
         "schedule_proxy_off": "No proxy",
+        "schedule_cpamc_auto_import_on": "Auto import to CPAMC after completion",
+        "schedule_cpamc_auto_import_off": "Do not auto import to CPAMC",
+        "schedule_detail_title": "Scheduled Task Detail",
+        "schedule_target_quantity": "Target {value}",
+        "schedule_completed_quantity": "Completed {value}",
+        "schedule_today_status": "Today {value}",
+        "schedule_completed_runs": "Completed {value} scheduled runs",
+        "schedule_today_none": "Not triggered today",
+        "schedule_tag_suffix": "· Scheduled",
+        "schedule_runs_short": "runs done",
+        "schedule_today_detail_title": "Today's Run",
+        "schedule_latest_task_title": "Latest Run",
+        "schedule_console_empty": "No console output for today's run yet",
         "api_key_meta": "{prefix}... | Created at {created_at}",
     },
 }
@@ -612,6 +652,7 @@ def init_db() -> None:
                 pid INTEGER,
                 last_error TEXT,
                 source TEXT NOT NULL DEFAULT 'ui',
+                schedule_id INTEGER,
                 auto_delete_at TEXT,
                 FOREIGN KEY(email_credential_id) REFERENCES credentials(id),
                 FOREIGN KEY(captcha_credential_id) REFERENCES credentials(id)
@@ -625,6 +666,7 @@ def init_db() -> None:
                 concurrency INTEGER NOT NULL DEFAULT 1,
                 time_of_day TEXT NOT NULL,
                 use_proxy INTEGER NOT NULL DEFAULT 0,
+                auto_import_cpamc INTEGER NOT NULL DEFAULT 0,
                 enabled INTEGER NOT NULL DEFAULT 1,
                 last_run_date TEXT,
                 created_at TEXT NOT NULL,
@@ -667,7 +709,15 @@ def init_db() -> None:
             "tasks",
             {
                 "source": "TEXT NOT NULL DEFAULT 'ui'",
+                "schedule_id": "INTEGER",
                 "auto_delete_at": "TEXT",
+            },
+        )
+        ensure_columns(
+            conn,
+            "schedules",
+            {
+                "auto_import_cpamc": "INTEGER NOT NULL DEFAULT 0",
             },
         )
         conn.commit()
@@ -765,12 +815,14 @@ def get_cpamc_settings() -> dict[str, Any]:
     management_key = (get_setting("cpamc_management_key") or "").strip()
     linked = get_setting("cpamc_linked") == "1"
     last_error = (get_setting("cpamc_last_error") or "").strip()
+    auto_import_enabled = get_setting("cpamc_auto_import_enabled") == "1"
     return {
         "enabled": enabled,
         "base_url": base_url,
         "management_key": management_key,
         "linked": linked,
         "last_error": last_error,
+        "auto_import_enabled": auto_import_enabled,
     }
 
 
@@ -780,6 +832,7 @@ def set_cpamc_settings(settings: dict[str, Any]) -> dict[str, Any]:
     set_setting("cpamc_management_key", str(settings.get("management_key") or "").strip())
     set_setting("cpamc_linked", "1" if settings.get("linked") else "0")
     set_setting("cpamc_last_error", str(settings.get("last_error") or "").strip())
+    set_setting("cpamc_auto_import_enabled", "1" if settings.get("auto_import_enabled") else "0")
     return get_cpamc_settings()
 
 
@@ -851,6 +904,79 @@ def cpamc_import_candidates(task: sqlite3.Row | dict[str, Any], *, validate: boo
             if token_type in {"codex", "grok"} or ("access_token" in payload and "refresh_token" in payload):
                 files.append(file_path)
     return files
+
+
+def task_requests_cpamc_auto_import(task: sqlite3.Row | dict[str, Any]) -> bool:
+    try:
+        requested = json.loads(task["requested_config_json"])
+    except Exception:
+        requested = {}
+    return bool(requested.get("cpamc_auto_import"))
+
+
+def cpamc_is_ready(cpamc: dict[str, Any]) -> bool:
+    return bool(cpamc.get("enabled") and cpamc.get("linked") and cpamc.get("base_url") and cpamc.get("management_key"))
+
+
+def append_task_console(task: sqlite3.Row | dict[str, Any], message: str) -> None:
+    console_path = Path(task["console_path"])
+    console_path.parent.mkdir(parents=True, exist_ok=True)
+    with console_path.open("a", encoding="utf-8", buffering=1) as log_handle:
+        log_handle.write(f"[{now_iso()}] {message}\n")
+
+
+def import_task_files_to_cpamc(
+    task: sqlite3.Row | dict[str, Any],
+    *,
+    cpamc: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    cpamc_settings = cpamc or get_cpamc_settings()
+    if not cpamc_settings["enabled"]:
+        raise RuntimeError("CPAMC is not enabled")
+    if not cpamc_settings["linked"]:
+        raise RuntimeError("CPAMC is not linked yet")
+    if not cpamc_settings["base_url"] or not cpamc_settings["management_key"]:
+        raise RuntimeError("CPAMC configuration is incomplete")
+
+    candidates = cpamc_import_candidates(task, validate=True)
+    if not candidates:
+        raise RuntimeError("No importable JSON files were found for this task")
+
+    imported: list[str] = []
+    failed: list[dict[str, str]] = []
+    for file_path in candidates:
+        try:
+            payload_bytes = file_path.read_bytes()
+        except Exception as exc:
+            failed.append({"name": file_path.name, "error": str(exc)})
+            continue
+        try:
+            response = cpamc_request(
+                "POST",
+                base_url=str(cpamc_settings["base_url"]),
+                management_key=str(cpamc_settings["management_key"]),
+                path=f"auth-files?name={quote(file_path.name)}",
+                data=payload_bytes,
+                headers={"Content-Type": "application/json"},
+            )
+        except requests.RequestException as exc:
+            failed.append({"name": file_path.name, "error": str(exc)})
+            continue
+        if response.ok:
+            imported.append(file_path.name)
+        else:
+            failed.append({"name": file_path.name, "error": parse_cpamc_error(response)})
+
+    if not imported:
+        first_error = failed[0]["error"] if failed else "Unknown import error"
+        raise RuntimeError(f"CPAMC import failed: {first_error}")
+    return {
+        "ok": True,
+        "imported_count": len(imported),
+        "failed_count": len(failed),
+        "imported": imported,
+        "failed": failed,
+    }
 
 
 def hash_password(password: str, salt_hex: str | None = None) -> str:
@@ -1133,6 +1259,7 @@ class ScheduleCreate(BaseModel):
     concurrency: int = Field(default=1, ge=1, le=64)
     time_of_day: str = Field(pattern=r"^\d{2}:\d{2}$")
     use_proxy: bool = False
+    auto_import_cpamc: bool = False
     enabled: bool = True
 
 
@@ -1169,6 +1296,7 @@ class CpamcSettingsPayload(BaseModel):
     enabled: bool = False
     base_url: str | None = None
     management_key: str | None = None
+    auto_import_enabled: bool = False
 
 
 class ApiKeyCreate(BaseModel):
@@ -1185,6 +1313,8 @@ class TaskResolvedConfig:
     proxy_value: str | None
     proxy_mode: str
     source: str
+    schedule_id: int | None
+    cpamc_auto_import: bool
     auto_delete_at: str | None
     requested_config: dict[str, Any]
 
@@ -1206,6 +1336,8 @@ def resolve_task_configuration(
     proxy_mode: str,
     proxy_id: int | None,
     source: str,
+    schedule_id: int | None,
+    cpamc_auto_import: bool,
     auto_delete_at: str | None,
 ) -> tuple[str, TaskResolvedConfig]:
     spec = validate_platform(platform)
@@ -1230,6 +1362,8 @@ def resolve_task_configuration(
         "quantity": quantity,
         "concurrency": resolved_concurrency,
         "source": source,
+        "schedule_id": schedule_id,
+        "cpamc_auto_import": cpamc_auto_import,
         "proxy_mode": proxy_mode,
         "proxy_id": proxy_id,
         "proxy_value": proxy_value,
@@ -1246,6 +1380,8 @@ def resolve_task_configuration(
         proxy_value=proxy_value,
         proxy_mode=proxy_mode,
         source=source,
+        schedule_id=schedule_id,
+        cpamc_auto_import=cpamc_auto_import,
         auto_delete_at=auto_delete_at,
         requested_config=requested_config,
     )
@@ -1260,9 +1396,9 @@ def insert_task(*, name: str, config: TaskResolvedConfig) -> int:
         """
         INSERT INTO tasks (
             name, platform, quantity, status, email_credential_id, captcha_credential_id, concurrency,
-            proxy, task_dir, console_path, archive_path, requested_config_json, created_at, source, auto_delete_at
+            proxy, task_dir, console_path, archive_path, requested_config_json, created_at, source, schedule_id, auto_delete_at
         )
-        VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)
+        VALUES (?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)
         """,
         (
             name,
@@ -1277,6 +1413,7 @@ def insert_task(*, name: str, config: TaskResolvedConfig) -> int:
             json.dumps(config.requested_config, ensure_ascii=False),
             timestamp,
             config.source,
+            config.schedule_id,
             config.auto_delete_at,
         ),
     )
@@ -1291,6 +1428,34 @@ def insert_task(*, name: str, config: TaskResolvedConfig) -> int:
         (str(final_dir), str(final_console_path), task_id),
     )
     write_json(final_dir / "task.json", {"id": task_id, **config.requested_config, "created_at": timestamp})
+    return task_id
+
+
+def create_task_from_schedule(schedule: sqlite3.Row, *, update_last_run_date: bool) -> int:
+    quantity = int(schedule["quantity"])
+    concurrency = int(schedule["concurrency"])
+    proxy_mode = "default" if int(schedule["use_proxy"] or 0) else "none"
+    schedule_name = f"{schedule['name']} {now().strftime('%Y-%m-%d %H:%M:%S')}"
+    _, config = resolve_task_configuration(
+        name=schedule_name,
+        platform=str(schedule["platform"]),
+        quantity=quantity,
+        concurrency=concurrency,
+        email_credential_id=None,
+        captcha_credential_id=None,
+        proxy_mode=proxy_mode,
+        proxy_id=None,
+        source="schedule",
+        schedule_id=int(schedule["id"]),
+        cpamc_auto_import=bool(schedule["auto_import_cpamc"]),
+        auto_delete_at=None,
+    )
+    task_id = insert_task(name=schedule_name, config=config)
+    if update_last_run_date:
+        execute_no_return(
+            "UPDATE schedules SET last_run_date = ?, updated_at = ? WHERE id = ?",
+            (now().strftime("%Y-%m-%d"), now_iso(), int(schedule["id"])),
+        )
     return task_id
 
 
@@ -1391,6 +1556,7 @@ class TaskSupervisor:
         task_dir.mkdir(parents=True, exist_ok=True)
         console_path = paths["console_path"]
         requested = json.loads(task["requested_config_json"])
+        remaining_quantity = max(1, int(task["quantity"]) - count_result_lines(task))
 
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
@@ -1442,7 +1608,7 @@ class TaskSupervisor:
                 sys.executable,
                 str(ROOT_DIR / "chatgpt_register_v2" / "chatgpt_register_v2.py"),
                 "-n",
-                str(int(task["quantity"])),
+                str(remaining_quantity),
                 "-w",
                 str(int(task["concurrency"])),
             ]
@@ -1530,27 +1696,7 @@ class TaskSupervisor:
             if schedule["last_run_date"] == today:
                 continue
             try:
-                quantity = int(schedule["quantity"])
-                concurrency = int(schedule["concurrency"])
-                proxy_mode = "default" if int(schedule["use_proxy"] or 0) else "none"
-                schedule_name = f"{schedule['name']} {today}"
-                _, config = resolve_task_configuration(
-                    name=schedule_name,
-                    platform=str(schedule["platform"]),
-                    quantity=quantity,
-                    concurrency=concurrency,
-                    email_credential_id=None,
-                    captcha_credential_id=None,
-                    proxy_mode=proxy_mode,
-                    proxy_id=None,
-                    source="schedule",
-                    auto_delete_at=None,
-                )
-                insert_task(name=schedule_name, config=config)
-                execute_no_return(
-                    "UPDATE schedules SET last_run_date = ?, updated_at = ? WHERE id = ?",
-                    (today, now_iso(), int(schedule["id"])),
-                )
+                create_task_from_schedule(schedule, update_last_run_date=True)
             except Exception as exc:
                 print(f"[web-console] schedule {schedule['id']} failed: {exc}")
 
@@ -1583,6 +1729,23 @@ class TaskSupervisor:
         quantity = int(row["quantity"])
         current_status = row["status"]
         exit_error = None if exit_code == 0 else f"Task exited with code {exit_code}."
+        if self._should_retry_task(row, results_count):
+            append_task_console(
+                row,
+                f"Current successful results: {results_count}/{quantity}. Re-queueing task to keep running until target is reached.",
+            )
+            execute_no_return(
+                """
+                UPDATE tasks
+                SET status = 'queued',
+                    pid = NULL,
+                    exit_code = NULL,
+                    last_error = NULL
+                WHERE id = ?
+                """,
+                (task_id,),
+            )
+            return
         if results_count >= quantity:
             status = "completed"
             error = None
@@ -1607,7 +1770,35 @@ class TaskSupervisor:
             """,
             (status, now_iso(), exit_code, error, task_id),
         )
-        create_archive(get_task(task_id))
+        completed_task = get_task(task_id)
+        create_archive(completed_task)
+        self._maybe_auto_import_task(completed_task)
+
+    @staticmethod
+    def _should_retry_task(task: sqlite3.Row, results_count: int) -> bool:
+        if str(task["status"]) == "stopping":
+            return False
+        if int(task["quantity"]) <= results_count:
+            return False
+        return str(task["platform"]) == "chatgpt-register-v2"
+
+    def _maybe_auto_import_task(self, task: sqlite3.Row) -> None:
+        if str(task["status"]) != "completed":
+            return
+        cpamc = get_cpamc_settings()
+        if not (cpamc["auto_import_enabled"] or task_requests_cpamc_auto_import(task)):
+            return
+        if not cpamc_is_ready(cpamc):
+            append_task_console(task, "Skipped auto import to CPAMC because CPAMC is not enabled or not linked.")
+            return
+        try:
+            result = import_task_files_to_cpamc(task, cpamc=cpamc)
+            append_task_console(
+                task,
+                f"Auto import to CPAMC finished: imported {result['imported_count']}, failed {result['failed_count']}.",
+            )
+        except Exception as exc:
+            append_task_console(task, f"Auto import to CPAMC failed: {exc}")
 
     @staticmethod
     def _terminate_process(process: subprocess.Popen[str]) -> None:
@@ -1766,6 +1957,7 @@ async def update_cpamc_settings(payload: CpamcSettingsPayload, request: Request)
             "management_key": management_key,
             "linked": linked,
             "last_error": previous["last_error"] if linked else "",
+            "auto_import_enabled": payload.auto_import_enabled,
         }
     )
     return JSONResponse({"ok": True, "cpamc": saved})
@@ -1795,6 +1987,7 @@ async def test_cpamc_settings(payload: CpamcSettingsPayload, request: Request) -
                 "management_key": management_key,
                 "linked": False,
                 "last_error": str(exc),
+                "auto_import_enabled": payload.auto_import_enabled,
             }
         )
         raise HTTPException(status_code=502, detail=f"CPAMC connection failed: {exc}") from exc
@@ -1807,6 +2000,7 @@ async def test_cpamc_settings(payload: CpamcSettingsPayload, request: Request) -
                 "management_key": management_key,
                 "linked": False,
                 "last_error": message,
+                "auto_import_enabled": payload.auto_import_enabled,
             }
         )
         raise HTTPException(status_code=502, detail=f"CPAMC test failed: {message}")
@@ -1817,6 +2011,7 @@ async def test_cpamc_settings(payload: CpamcSettingsPayload, request: Request) -
             "management_key": management_key,
             "linked": True,
             "last_error": "",
+            "auto_import_enabled": payload.auto_import_enabled,
         }
     )
     return JSONResponse({"ok": True, "linked": True, "cpamc": saved})
@@ -1919,6 +2114,8 @@ async def create_task(payload: TaskCreate, request: Request) -> JSONResponse:
         proxy_mode=payload.proxy_mode,
         proxy_id=payload.proxy_id,
         source="ui",
+        schedule_id=None,
+        cpamc_auto_import=False,
         auto_delete_at=None,
     )
     task_id = insert_task(name=name, config=config)
@@ -1948,56 +2145,16 @@ async def stop_task(task_id: int, request: Request) -> JSONResponse:
 @app.post("/api/tasks/{task_id}/cpamc-import")
 async def import_task_to_cpamc(task_id: int, request: Request) -> JSONResponse:
     require_authenticated(request)
-    cpamc = get_cpamc_settings()
-    if not cpamc["enabled"]:
-        raise HTTPException(status_code=400, detail="CPAMC is not enabled")
-    if not cpamc["linked"]:
-        raise HTTPException(status_code=400, detail="CPAMC is not linked yet")
-    if not cpamc["base_url"] or not cpamc["management_key"]:
-        raise HTTPException(status_code=400, detail="CPAMC configuration is incomplete")
-
     task = get_task(task_id)
-    candidates = cpamc_import_candidates(task, validate=True)
-    if not candidates:
-        raise HTTPException(status_code=400, detail="No importable JSON files were found for this task")
-
-    imported: list[str] = []
-    failed: list[dict[str, str]] = []
-    for file_path in candidates:
-        try:
-            payload_bytes = file_path.read_bytes()
-        except Exception as exc:
-            failed.append({"name": file_path.name, "error": str(exc)})
-            continue
-        try:
-            response = cpamc_request(
-                "POST",
-                base_url=str(cpamc["base_url"]),
-                management_key=str(cpamc["management_key"]),
-                path=f"auth-files?name={quote(file_path.name)}",
-                data=payload_bytes,
-                headers={"Content-Type": "application/json"},
-            )
-        except requests.RequestException as exc:
-            failed.append({"name": file_path.name, "error": str(exc)})
-            continue
-        if response.ok:
-            imported.append(file_path.name)
-        else:
-            failed.append({"name": file_path.name, "error": parse_cpamc_error(response)})
-
-    if not imported:
-        first_error = failed[0]["error"] if failed else "Unknown import error"
-        raise HTTPException(status_code=502, detail=f"CPAMC import failed: {first_error}")
-    return JSONResponse(
-        {
-            "ok": True,
-            "imported_count": len(imported),
-            "failed_count": len(failed),
-            "imported": imported,
-            "failed": failed,
-        }
-    )
+    try:
+        result = import_task_files_to_cpamc(task)
+    except RuntimeError as exc:
+        message = str(exc)
+        status_code = 400
+        if message.startswith("CPAMC import failed:"):
+            status_code = 502
+        raise HTTPException(status_code=status_code, detail=message) from exc
+    return JSONResponse(result)
 
 
 @app.get("/api/tasks/{task_id}/download")
@@ -2035,8 +2192,8 @@ async def create_schedule(payload: ScheduleCreate, request: Request) -> JSONResp
     timestamp = now_iso()
     schedule_id = execute(
         """
-        INSERT INTO schedules (name, platform, quantity, concurrency, time_of_day, use_proxy, enabled, last_run_date, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
+        INSERT INTO schedules (name, platform, quantity, concurrency, time_of_day, use_proxy, auto_import_cpamc, enabled, last_run_date, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)
         """,
         (
             payload.name.strip(),
@@ -2045,6 +2202,7 @@ async def create_schedule(payload: ScheduleCreate, request: Request) -> JSONResp
             payload.concurrency,
             payload.time_of_day,
             1 if payload.use_proxy else 0,
+            1 if payload.auto_import_cpamc else 0,
             1 if payload.enabled else 0,
             timestamp,
             timestamp,
@@ -2060,6 +2218,14 @@ async def toggle_schedule(schedule_id: int, request: Request) -> JSONResponse:
     next_value = 0 if int(row["enabled"]) else 1
     execute_no_return("UPDATE schedules SET enabled = ?, updated_at = ? WHERE id = ?", (next_value, now_iso(), schedule_id))
     return JSONResponse({"ok": True})
+
+
+@app.post("/api/schedules/{schedule_id}/run")
+async def run_schedule_now(schedule_id: int, request: Request) -> JSONResponse:
+    require_authenticated(request)
+    row = get_schedule(schedule_id)
+    task_id = create_task_from_schedule(row, update_last_run_date=False)
+    return JSONResponse({"ok": True, "id": task_id})
 
 
 @app.delete("/api/schedules/{schedule_id}")
@@ -2106,6 +2272,8 @@ async def external_create_task(payload: ExternalTaskCreate, request: Request) ->
         proxy_mode=proxy_mode,
         proxy_id=None,
         source="api",
+        schedule_id=None,
+        cpamc_auto_import=False,
         auto_delete_at=auto_delete_at,
     )
     task_id = insert_task(name=task_name, config=config)

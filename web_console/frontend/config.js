@@ -125,5 +125,6 @@ export function normalizeTaskDraft(draft, platforms, credentials, proxies) {
 
 export function getTaskDisplayName(task) {
   const value = typeof task?.name === 'string' ? task.name.trim() : '';
-  return value || `#${task?.id ?? ''}`;
+  const base = value || `#${task?.id ?? ''}`;
+  return task?.source === 'schedule' ? `${base} ${tr('schedule_tag_suffix')}` : base;
 }

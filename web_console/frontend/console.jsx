@@ -361,8 +361,10 @@ export function ConsoleApp() {
   const [loadError, setLoadError] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [flashNotice, setFlashNotice] = useState(null);
+  const [taskListMode, setTaskListMode] = useState('task');
   const [taskFilterStatus, setTaskFilterStatus] = useState('all');
   const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [selectedScheduleId, setSelectedScheduleId] = useState(null);
   const [flashKey, setFlashKey] = useState('');
   const [modalState, setModalState] = useState(null);
   const [statePayload, setStatePayload] = useState({
@@ -404,6 +406,7 @@ export function ConsoleApp() {
     concurrency: '1',
     time_of_day: '',
     use_proxy: false,
+    auto_import_cpamc: false,
   });
   const [cpamcDraft, setCpamcDraft] = useState({
     enabled: false,
@@ -411,6 +414,7 @@ export function ConsoleApp() {
     management_key: '',
     linked: false,
     last_error: '',
+    auto_import_enabled: false,
   });
   const [cpamcDirty, setCpamcDirty] = useState(false);
   const [apiKeyName, setApiKeyName] = useState('');
@@ -419,17 +423,20 @@ export function ConsoleApp() {
 
   const mailCredentials = statePayload.credentials.filter((item) => isEmailCredentialKind(item.kind));
   const captchaCredentials = statePayload.credentials.filter((item) => item.kind === 'yescaptcha');
+  const normalTasks = statePayload.tasks.filter((task) => task.source !== 'schedule');
   const filteredTasks = taskFilterStatus === 'all'
-    ? statePayload.tasks
-    : statePayload.tasks.filter((task) => task.status === taskFilterStatus);
+    ? normalTasks
+    : normalTasks.filter((task) => task.status === taskFilterStatus);
   const visibleTask = filteredTasks.find((item) => item.id === selectedTaskId) || filteredTasks[0] || null;
+  const visibleSchedule = statePayload.schedules.find((item) => item.id === selectedScheduleId) || statePayload.schedules[0] || null;
   const currentPlatformSpec = statePayload.platforms[taskDraft.platform] || {};
   const credentialFieldMeta = getCredentialFieldMeta(credentialDraft.kind);
   const currentSectionLabel = tr(SECTION_TITLE_KEYS[activeSection] || 'section_overview');
   const topbarBreadcrumbs = [
     tr('topbar_workspace'),
     ...(activeSection === 'dashboard' ? [] : [currentSectionLabel]),
-    ...(activeSection === 'task-detail' && visibleTask ? [getTaskDisplayName(visibleTask)] : []),
+    ...(activeSection === 'task-detail' && taskListMode === 'task' && visibleTask ? [getTaskDisplayName(visibleTask)] : []),
+    ...(activeSection === 'task-detail' && taskListMode === 'schedule' && visibleSchedule ? [`${visibleSchedule.name} ${tr('schedule_tag_suffix')}`] : []),
   ];
   const logoutLabel = tr('nav_logout');
 
@@ -498,6 +505,7 @@ export function ConsoleApp() {
         management_key: payload.cpamc?.management_key || '',
         linked: Boolean(payload.cpamc?.linked),
         last_error: payload.cpamc?.last_error || '',
+        auto_import_enabled: Boolean(payload.cpamc?.auto_import_enabled),
       });
     }
     setTaskDraft((current) => normalizeTaskDraft(initial ? initialTaskDraft(payload.platforms) : current, payload.platforms, payload.credentials, payload.proxies));
@@ -510,6 +518,12 @@ export function ConsoleApp() {
         return current;
       }
       return payload.tasks[0]?.id || null;
+    });
+    setSelectedScheduleId((current) => {
+      if (payload.schedules.some((item) => item.id === current)) {
+        return current;
+      }
+      return payload.schedules[0]?.id || null;
     });
   }
 
@@ -667,6 +681,7 @@ export function ConsoleApp() {
         concurrency: '1',
         time_of_day: '',
         use_proxy: false,
+        auto_import_cpamc: false,
       });
       await refreshState();
     });
@@ -682,6 +697,7 @@ export function ConsoleApp() {
             enabled: cpamcDraft.enabled,
             base_url: cpamcDraft.base_url,
             management_key: cpamcDraft.management_key,
+            auto_import_enabled: cpamcDraft.auto_import_enabled,
           }),
         });
         setCpamcDirty(false);
@@ -701,6 +717,7 @@ export function ConsoleApp() {
             enabled: cpamcDraft.enabled,
             base_url: cpamcDraft.base_url,
             management_key: cpamcDraft.management_key,
+            auto_import_enabled: cpamcDraft.auto_import_enabled,
           }),
         });
         setCpamcDirty(false);
@@ -824,9 +841,60 @@ export function ConsoleApp() {
     });
   }
 
+  function getTodayDateKey() {
+    const value = new Date();
+    const year = String(value.getFullYear());
+    const month = String(value.getMonth() + 1).padStart(2, '0');
+    const day = String(value.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function getScheduleTaskSummary(task) {
+    if (!task || task.source !== 'schedule' || !task.schedule_id) {
+      return null;
+    }
+    const scheduleId = Number(task.schedule_id);
+    const schedule = statePayload.schedules.find((item) => Number(item.id) === scheduleId);
+    if (!schedule) {
+      return null;
+    }
+    const relatedTasks = statePayload.tasks.filter((item) => Number(item.schedule_id) === scheduleId);
+    const todayTask = relatedTasks.find((item) => String(item.created_at || '').startsWith(getTodayDateKey())) || null;
+    return {
+      schedule,
+      completedRuns: relatedTasks.filter((item) => item.status === 'completed').length,
+      todayTask,
+    };
+  }
+
+  function getScheduleDetail(schedule) {
+    if (!schedule) {
+      return null;
+    }
+    const relatedTasks = statePayload.tasks.filter((item) => Number(item.schedule_id) === Number(schedule.id));
+    const todayTask = relatedTasks.find((item) => String(item.created_at || '').startsWith(getTodayDateKey())) || null;
+    const latestTask = relatedTasks[0] || null;
+    const importTask = relatedTasks.find((item) => Number(item.cpamc_importable_count || 0) > 0) || null;
+    return {
+      relatedTasks,
+      todayTask,
+      latestTask,
+      importTask,
+      completedRuns: relatedTasks.filter((item) => item.status === 'completed').length,
+    };
+  }
+
   async function handleToggleSchedule(item) {
     await withBusy(`schedule-toggle-${item.id}`, async () => {
       await api(`/api/schedules/${item.id}/toggle`, { method: 'POST' });
+      await refreshState();
+    });
+  }
+
+  async function handleRunScheduleNow(item) {
+    await withBusy(`schedule-run-${item.id}`, async () => {
+      const result = await api(`/api/schedules/${item.id}/run`, { method: 'POST' });
+      setSelectedTaskId(Number(result.id));
       await refreshState();
     });
   }
@@ -1186,6 +1254,8 @@ export function ConsoleApp() {
   }
 
   function renderTaskDetail() {
+    const scheduleSummary = visibleTask ? getScheduleTaskSummary(visibleTask) : null;
+    const scheduleDetail = visibleSchedule ? getScheduleDetail(visibleSchedule) : null;
     return (
       <section className="section-card active">
         <p className="subtle task-detail-note content-section-note">{tr('task_detail_note')}</p>
@@ -1198,7 +1268,15 @@ export function ConsoleApp() {
                   <span>{tr('task_list_desc')}</span>
                 </div>
               </div>
-              <div className="task-filter-bar">
+              <div className="task-filter-bar task-filter-grid">
+                <label className="field-card field-card--compact">
+                  <span>{tr('task_list_mode')}</span>
+                  <select value={taskListMode} onChange={(event) => setTaskListMode(event.target.value)}>
+                    <option value="task">{tr('task_list_mode_task')}</option>
+                    <option value="schedule">{tr('task_list_mode_schedule')}</option>
+                  </select>
+                </label>
+                {taskListMode === 'task' ? (
                 <label className="field-card field-card--compact">
                   <span>{tr('task_filter_status')}</span>
                   <select value={taskFilterStatus} onChange={(event) => setTaskFilterStatus(event.target.value)}>
@@ -1207,9 +1285,10 @@ export function ConsoleApp() {
                     ))}
                   </select>
                 </label>
+                ) : null}
               </div>
               <div className="task-side-list">
-                {filteredTasks.length ? filteredTasks.map((task) => (
+                {taskListMode === 'task' ? filteredTasks.length ? filteredTasks.map((task) => (
                   <button key={task.id} type="button" className={`task-side-item ${visibleTask?.id === task.id ? 'selected' : ''}`.trim()} onClick={() => setSelectedTaskId(task.id)}>
                     <div className="task-side-item__top">
                       <strong className="task-side-item__name">{getTaskDisplayName(task)}</strong>
@@ -1220,15 +1299,31 @@ export function ConsoleApp() {
                       <span className={`status-pill status-pill--${task.status}`}>{statusLabel(task.status)}</span>
                     </div>
                   </button>
-                )) : <p className="empty">{tr('empty_filtered_tasks')}</p>}
+                )) : <p className="empty">{tr('empty_filtered_tasks')}</p> : statePayload.schedules.length ? statePayload.schedules.map((schedule) => {
+                  const detail = getScheduleDetail(schedule);
+                  return (
+                    <button key={schedule.id} type="button" className={`task-side-item ${visibleSchedule?.id === schedule.id ? 'selected' : ''}`.trim()} onClick={() => setSelectedScheduleId(schedule.id)}>
+                      <div className="task-side-item__top">
+                        <strong className="task-side-item__name">{schedule.name} {tr('schedule_tag_suffix')}</strong>
+                        <span className="task-side-item__id">#{schedule.id}</span>
+                      </div>
+                      <div className="task-side-item__meta">
+                        <span className="task-side-item__count">{detail?.completedRuns || 0} {tr('schedule_runs_short')}</span>
+                        <span className={`status-pill ${schedule.enabled ? 'status-pill--linked' : 'status-pill--disabled'}`.trim()}>
+                          {schedule.enabled ? tr('enable') : tr('disable')}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                }) : <p className="empty">{tr('empty_schedules')}</p>}
               </div>
             </article>
           </aside>
           <article className="panel task-detail-panel">
-            {visibleTask ? (
+            {taskListMode === 'task' && visibleTask ? (
               <>
-                <div className="task-detail-header">
-                  <div>
+                <div className={`task-detail-header ${scheduleSummary ? 'task-detail-header--split' : ''}`.trim()}>
+                  <div className="task-detail-header-main">
                     <h3>{getTaskDisplayName(visibleTask)} (#{visibleTask.id})</h3>
                     <p className="meta">{tr('task_header_meta', {
                       platform: visibleTask.platform,
@@ -1237,6 +1332,19 @@ export function ConsoleApp() {
                       status: statusLabel(visibleTask.status),
                     })}</p>
                   </div>
+                  {scheduleSummary ? (
+                    <aside className="schedule-summary-card">
+                      <strong>{tr('schedule_detail_title')}</strong>
+                      <p className="meta">{scheduleSummary.schedule.name}</p>
+                      <div className="schedule-summary-list">
+                        <span>{scheduleSummary.schedule.platform}</span>
+                        <span>{tr('schedule_target_quantity', { value: scheduleSummary.todayTask?.quantity ?? scheduleSummary.schedule.quantity })}</span>
+                        <span>{tr('schedule_completed_quantity', { value: scheduleSummary.todayTask?.results_count ?? 0 })}</span>
+                        <span>{tr('schedule_today_status', { value: scheduleSummary.todayTask ? statusLabel(scheduleSummary.todayTask.status) : tr('schedule_today_none') })}</span>
+                        <span>{tr('schedule_completed_runs', { value: scheduleSummary.completedRuns })}</span>
+                      </div>
+                    </aside>
+                  ) : null}
                 </div>
                 <div className="task-actions">
                   <BusyButton type="button" busy={isBusy(`task-stop-${visibleTask.id}`)} disabled={!['queued', 'running', 'stopping'].includes(visibleTask.status)} onClick={() => handleStopTask(visibleTask)}>{tr('stop_task')}</BusyButton>
@@ -1260,6 +1368,41 @@ export function ConsoleApp() {
                   <pre id="task-console" ref={consoleRef}>{visibleTask.console_tail || tr('console_empty')}</pre>
                 </div>
               </>
+            ) : taskListMode === 'schedule' && visibleSchedule ? (
+              <div className="schedule-detail-layout">
+                <div className="task-detail-header">
+                  <div className="task-detail-header-main">
+                    <h3>{visibleSchedule.name} {tr('schedule_tag_suffix')} (#{visibleSchedule.id})</h3>
+                    <p className="meta">
+                      {visibleSchedule.platform} | {tr('schedule_target_quantity', { value: visibleSchedule.quantity })} | {tr('schedule_completed_quantity', { value: scheduleDetail?.todayTask?.results_count ?? 0 })} | {tr('schedule_today_status', { value: scheduleDetail?.todayTask ? statusLabel(scheduleDetail.todayTask.status) : tr('schedule_today_none') })}
+                    </p>
+                    <p className="notes">
+                      {tr('schedule_completed_runs', { value: scheduleDetail?.completedRuns ?? 0 })} | {visibleSchedule.use_proxy ? tr('schedule_proxy_on') : tr('schedule_proxy_off')} | {visibleSchedule.auto_import_cpamc ? tr('schedule_cpamc_auto_import_on') : tr('schedule_cpamc_auto_import_off')}
+                    </p>
+                  </div>
+                </div>
+                <div className="task-actions">
+                  <BusyButton type="button" busy={isBusy(`schedule-run-${visibleSchedule.id}`)} onClick={() => handleRunScheduleNow(visibleSchedule)}>{tr('run_schedule_now')}</BusyButton>
+                  <BusyButton type="button" busy={isBusy(`schedule-toggle-${visibleSchedule.id}`)} onClick={() => handleToggleSchedule(visibleSchedule)}>{visibleSchedule.enabled ? tr('disable') : tr('enable')}</BusyButton>
+                  <BusyButton type="button" className="danger" busy={isBusy(`schedule-delete-${visibleSchedule.id}`)} onClick={() => handleDeleteSchedule(visibleSchedule)}>{tr('delete')}</BusyButton>
+                  {statePayload.cpamc?.enabled && statePayload.cpamc?.linked ? (
+                    <BusyButton
+                      type="button"
+                      className="ghost-btn"
+                      busy={isBusy(`cpamc-import-${scheduleDetail?.importTask?.id}`)}
+                      disabled={!scheduleDetail?.importTask}
+                      title={!scheduleDetail?.importTask ? tr('cpamc_import_disabled') : ''}
+                      onClick={() => handleImportTaskToCpamc(scheduleDetail.importTask)}
+                    >
+                      {tr('cpamc_import_button')}
+                    </BusyButton>
+                  ) : null}
+                </div>
+                <div className="console-box large-console">
+                  <div className="console-title">{tr('console_title')}</div>
+                  <pre>{scheduleDetail?.todayTask?.console_tail || tr('schedule_console_empty')}</pre>
+                </div>
+              </div>
             ) : (
               <div className="task-empty">
                 <h3>{tr('task_detail_empty_title')}</h3>
@@ -1310,6 +1453,10 @@ export function ConsoleApp() {
                 <input type="checkbox" checked={scheduleDraft.use_proxy} onChange={(event) => setScheduleDraft((current) => ({ ...current, use_proxy: event.target.checked }))} />
                 <span>{tr('field_use_default_proxy')}</span>
               </label>
+              <label className="checkbox-row field-card field-card--checkbox">
+                <input type="checkbox" checked={scheduleDraft.auto_import_cpamc} onChange={(event) => setScheduleDraft((current) => ({ ...current, auto_import_cpamc: event.target.checked }))} />
+                <span>{tr('field_schedule_auto_import_cpamc')}</span>
+              </label>
               <BusyButton type="submit" busy={isBusy('schedule-save')}>{tr('save_schedule')}</BusyButton>
             </form>
           </article>
@@ -1332,6 +1479,7 @@ export function ConsoleApp() {
                       enabled: item.enabled ? tr('enable') : tr('disable'),
                     })}</p>
                     <p className="notes">{item.use_proxy ? tr('schedule_proxy_on') : tr('schedule_proxy_off')}</p>
+                    <p className="notes">{item.auto_import_cpamc ? tr('schedule_cpamc_auto_import_on') : tr('schedule_cpamc_auto_import_off')}</p>
                   </div>
                   <div className="entity-actions">
                     <BusyButton type="button" busy={isBusy(`schedule-toggle-${item.id}`)} onClick={() => handleToggleSchedule(item)}>{item.enabled ? tr('disable') : tr('enable')}</BusyButton>
@@ -1385,6 +1533,21 @@ export function ConsoleApp() {
             </div>
           </div>
           <form className="stack" onSubmit={handleCpamcSave}>
+            <label className="checkbox-row field-card field-card--checkbox">
+              <input
+                type="checkbox"
+                checked={cpamcDraft.auto_import_enabled}
+                onChange={(event) => {
+                  setCpamcDirty(true);
+                  setCpamcDraft((current) => ({
+                    ...current,
+                    auto_import_enabled: event.target.checked,
+                  }));
+                }}
+              />
+              <span>{tr('field_cpamc_auto_import')}</span>
+            </label>
+            <p className="field-tip">{tr('cpamc_auto_import_hint')}</p>
             <label className="field-card">
               <span>{tr('field_cpamc_base_url')}</span>
               <input

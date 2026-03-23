@@ -232,7 +232,8 @@ def main():
             # 直接用正则从 HTML 抓取所有 /_next/static/chunks/*.js
             js_urls = [urljoin(start_url, m.group(0)) for m in re.finditer(r"/_next/static/chunks/[^\"'\s>]+\.js", html)]
             if not js_urls:
-                print(f"[Warn] HTML 长度 {len(html)}, 未解析出 JS，前500字符预览: {html[:500].replace('\n',' ')}")
+                html_preview = html[:500].replace("\n", " ")
+                print(f"[Warn] HTML 长度 {len(html)}, 未解析出 JS，前500字符预览: {html_preview}")
             action_found = None
             for js_url in js_urls:
                 try:
