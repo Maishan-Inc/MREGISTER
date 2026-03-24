@@ -46,6 +46,14 @@ PLATFORMS = {
         "default_concurrency": 1,
         "notes": "Uses GPTMail via the chatgpt_register_v2 mail adapter and writes account/token files into the task directory.",
     },
+    "chatgpt-register-v3": {
+        "label": "ChatGPT Register v3",
+        "requires_email_credential": True,
+        "requires_captcha_credential": False,
+        "supports_proxy": True,
+        "default_concurrency": 1,
+        "notes": "Uses Codex registration flow with MoeMail/Cloudflare Temp Email support via the chatgpt_register_v3 adapter.",
+    },
     "grok-register": {
         "label": "Grok Register",
         "requires_email_credential": False,
@@ -1115,6 +1123,8 @@ def task_paths(task: sqlite3.Row | dict[str, Any]) -> dict[str, Path]:
         results_file = task_dir / "output" / "tokens" / "accounts.txt"
     elif task["platform"] == "chatgpt-register-v2":
         results_file = task_dir / "output" / "registered_accounts.txt"
+    elif task["platform"] == "chatgpt-register-v3":
+        results_file = task_dir / "output" / "registered_accounts.txt"
     else:
         results_file = task_dir / "keys" / "accounts.txt"
     archive_path = Path(task["archive_path"]) if task["archive_path"] else task_dir / "task_result.zip"
@@ -1553,6 +1563,33 @@ class TaskSupervisor:
                 str(int(task["concurrency"])),
             ]
             cwd = ROOT_DIR / "chatgpt_register_v2"
+        elif task["platform"] == "chatgpt-register-v3":
+            credential = get_credential(int(task["email_credential_id"]))
+            output_dir = task_dir / "output"
+            output_dir.mkdir(parents=True, exist_ok=True)
+            env["MAIL_PROVIDER"] = "gptmail"
+            env["GPTMAIL_API_KEY"] = credential["api_key"]
+            env["OUTPUT_FILE"] = str(output_dir / "registered_accounts.txt")
+            env["AK_FILE"] = str(output_dir / "ak.txt")
+            env["RK_FILE"] = str(output_dir / "rk.txt")
+            env["TOKEN_JSON_DIR"] = str(output_dir / "tokens")
+            if task["proxy"]:
+                env["PROXY"] = str(task["proxy"])
+            if credential["base_url"]:
+                env["MAIL_BASE_URL"] = credential["base_url"]
+            if credential["prefix"]:
+                env["MAIL_PREFIX"] = credential["prefix"]
+            if credential["domain"]:
+                env["MAIL_DOMAIN"] = credential["domain"]
+            command = [
+                sys.executable,
+                str(ROOT_DIR / "chatgpt_register_v3" / "chatgpt_register_v3.py"),
+                "-n",
+                str(remaining_quantity),
+                "-w",
+                str(int(task["concurrency"])),
+            ]
+            cwd = ROOT_DIR / "chatgpt_register_v3"
         elif task["platform"] == "grok-register":
             credential = get_credential(int(task["captcha_credential_id"]))
             env["YESCAPTCHA_KEY"] = credential["api_key"]
@@ -1720,7 +1757,7 @@ class TaskSupervisor:
             return False
         if int(task["quantity"]) <= results_count:
             return False
-        return str(task["platform"]) == "chatgpt-register-v2"
+        return str(task["platform"]) in ("chatgpt-register-v2", "chatgpt-register-v3")
 
     def _maybe_auto_import_task(self, task: sqlite3.Row) -> None:
         if str(task["status"]) != "completed":

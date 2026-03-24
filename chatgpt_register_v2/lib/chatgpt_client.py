@@ -16,6 +16,7 @@ except ImportError:
     sys.exit(1)
 
 from .sentinel_token import build_sentinel_token
+from .proxy_utils import normalize_proxy_url
 from .utils import generate_datadog_trace
 
 
@@ -59,12 +60,12 @@ class ChatGPTClient:
     def __init__(self, proxy=None, verbose=True):
         """
         初始化 ChatGPT 客户端
-        
+
         Args:
             proxy: 代理地址
             verbose: 是否输出详细日志
         """
-        self.proxy = proxy
+        self.proxy = normalize_proxy_url(proxy)
         self.verbose = verbose
         self.device_id = str(uuid.uuid4())
         

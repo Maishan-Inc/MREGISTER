@@ -4,12 +4,19 @@
 
 import os
 import json
+from typing import Any, Dict, Optional
 
 from .proxy_utils import normalize_proxy_url
+from .constants import EmailServiceType
 
 
-def load_config():
-    """从 config.json 加载配置，环境变量优先级更高"""
+def load_config() -> Dict[str, Any]:
+    """
+    从 config.json 加载配置，环境变量优先级更高
+
+    Returns:
+        配置字典
+    """
     config = {
         "total_accounts": 3,
         "concurrent_workers": 1,
@@ -52,9 +59,8 @@ def load_config():
                 file_config = json.load(f)
             config.update(file_config)
         except Exception as e:
-            print(f"⚠️ 加载 config.json 失败: {e}")
+            print(f"加载 config.json 失败: {e}")
 
-    # 环境变量优先级更高
     env_mappings = {
         "MAIL_PROVIDER": "mail_provider",
         "MAIL_BASE_URL": "mail_base_url",
@@ -105,10 +111,40 @@ def load_config():
     return config
 
 
-def as_bool(value):
-    """将值转换为布尔值"""
+def as_bool(value: Any) -> bool:
+    """
+    将值转换为布尔值
+
+    Args:
+        value: 输入值
+
+    Returns:
+        布尔值
+    """
     if isinstance(value, bool):
         return value
     if value is None:
         return False
     return str(value).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def get_email_service_type(provider: str) -> EmailServiceType:
+    """
+    获取邮箱服务类型
+
+    Args:
+        provider: 提供者名称
+
+    Returns:
+        EmailServiceType 枚举值
+    """
+    provider_map = {
+        "skymail": EmailServiceType.SKYMAIL,
+        "gptmail": EmailServiceType.GPTMAIL,
+        "moemail": EmailServiceType.MOEMAIL,
+        "moe_mail": EmailServiceType.MOEMAIL,
+        "cloudflare_temp_email": EmailServiceType.CLOUDFLARE_TEMP_EMAIL,
+        "cloudflare": EmailServiceType.CLOUDFLARE_TEMP_EMAIL,
+    }
+    normalized = (provider or "skymail").lower().replace("-", "_")
+    return provider_map.get(normalized, EmailServiceType.SKYMAIL)
