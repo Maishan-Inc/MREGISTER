@@ -3,11 +3,17 @@
 复用 chatgpt_register_v2 的邮箱客户端实现
 """
 
+import os
 import sys
 from typing import Any, Dict, Optional
 
 from .constants import EmailServiceType
 from .proxy_utils import normalize_proxy_url
+
+
+_v2_lib_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "chatgpt_register_v2", "lib")
+if os.path.exists(_v2_lib_path) and _v2_lib_path not in sys.path:
+    sys.path.insert(0, _v2_lib_path)
 
 
 class EmailServiceError(Exception):
@@ -23,11 +29,7 @@ class EmailServiceStatus:
 
 
 class BaseEmailService:
-    """
-    邮箱服务抽象基类
-    
-    所有邮箱服务必须实现此接口
-    """
+    """邮箱服务抽象基类"""
 
     def __init__(self, service_type: EmailServiceType, name: str = None):
         self.service_type = service_type
@@ -36,18 +38,6 @@ class BaseEmailService:
         self._last_error = None
 
     def create_email(self, config: Dict[str, Any] = None) -> Dict[str, Any]:
-        """
-        创建新邮箱地址
-
-        Args:
-            config: 配置参数
-
-        Returns:
-            包含邮箱信息的字典
-
-        Raises:
-            EmailServiceError: 创建失败
-        """
         raise NotImplementedError
 
     def get_verification_code(
@@ -58,31 +48,15 @@ class BaseEmailService:
         pattern: str = r"(?<!\d)(\d{6})(?!\d)",
         otp_sent_at: Optional[float] = None,
     ) -> Optional[str]:
-        """
-        获取验证码
-
-        Args:
-            email: 邮箱地址
-            email_id: 邮箱服务中的 ID
-            timeout: 超时时间（秒）
-            pattern: 验证码正则表达式
-            otp_sent_at: OTP 发送时间戳
-
-        Returns:
-            验证码字符串，如果超时或未找到返回 None
-        """
         raise NotImplementedError
 
     def list_emails(self, **kwargs) -> list:
-        """列出所有邮箱（如果服务支持）"""
         raise NotImplementedError
 
     def delete_email(self, email_id: str) -> bool:
-        """删除邮箱"""
         raise NotImplementedError
 
     def check_health(self) -> bool:
-        """检查服务健康状态"""
         raise NotImplementedError
 
 
@@ -90,21 +64,23 @@ def create_email_service(
     config: Dict[str, Any],
     proxy_url: Optional[str] = None
 ) -> BaseEmailService:
-    """
-    创建邮箱服务实例
-
-    Args:
-        config: 配置字典
-        proxy_url: 代理 URL
-
-    Returns:
-        邮箱服务实例
-    """
+    """创建邮箱服务实例"""
     provider = str(config.get("mail_provider", "skymail")).lower().replace("-", "_")
     normalized_proxy = normalize_proxy_url(proxy_url)
 
+    # 导入v2的邮箱客户端
+    try:
+        from skymail_client import (
+            SkymailClient, GPTMailAdapter, MoeMailAdapter, 
+            CloudflareTempEmailAdapter, init_skymail_client
+        )
+    except ImportError:
+        from chatgpt_register_v2.lib.skymail_client import (
+            SkymailClient, GPTMailAdapter, MoeMailAdapter,
+            CloudflareTempEmailAdapter, init_skymail_client
+        )
+
     if provider == "gptmail":
-        from chatgpt_register_v2.lib.skymail_client import GPTMailAdapter
         api_key = str(config.get("mail_api_key") or config.get("gptmail_api_key") or "").strip()
         base_url = str(config.get("mail_base_url") or config.get("gptmail_base_url") or "https://mail.chatgpt.org.uk").strip()
         prefix = str(config.get("mail_prefix") or config.get("gptmail_prefix") or "").strip() or None
@@ -113,7 +89,6 @@ def create_email_service(
 
         if not api_key:
             print("错误: 未配置 GPTMail API Key")
-            print(" 请在 config.json 或环境变量中设置 mail_api_key / MAIL_API_KEY")
             sys.exit(1)
 
         service = GPTMailAdapter(
@@ -127,8 +102,7 @@ def create_email_service(
         service.service_type = EmailServiceType.GPTMAIL
         return service
 
-    if provider == "moemail" or provider == "moe_mail":
-        from chatgpt_register_v2.lib.skymail_client import MoeMailAdapter
+    if provider in ("moemail", "moe_mail"):
         api_key = str(config.get("mail_api_key") or "").strip()
         base_url = str(config.get("mail_base_url") or "").strip()
         prefix = str(config.get("mail_prefix") or "").strip() or None
@@ -138,11 +112,9 @@ def create_email_service(
 
         if not api_key:
             print("错误: 未配置 MoeMail API Key")
-            print(" 请在 config.json 或环境变量中设置 mail_api_key / MAIL_API_KEY")
             sys.exit(1)
         if not base_url:
             print("错误: 未配置 MoeMail Base URL")
-            print(" 请在 config.json 或环境变量中设置 mail_base_url / MAIL_BASE_URL")
             sys.exit(1)
 
         service = MoeMailAdapter(
@@ -157,8 +129,7 @@ def create_email_service(
         service.service_type = EmailServiceType.MOEMAIL
         return service
 
-    if provider == "cloudflare_temp_email" or provider == "cloudflare":
-        from chatgpt_register_v2.lib.skymail_client import CloudflareTempEmailAdapter
+    if provider in ("cloudflare_temp_email", "cloudflare"):
         api_key = str(config.get("mail_api_key") or "").strip()
         base_url = str(config.get("mail_base_url") or "").strip()
         prefix = str(config.get("mail_prefix") or "").strip() or None
@@ -168,11 +139,9 @@ def create_email_service(
 
         if not api_key:
             print("错误: 未配置 Cloudflare Temp Email 管理密钥")
-            print(" 请在 config.json 或环境变量中设置 mail_api_key / MAIL_API_KEY")
             sys.exit(1)
         if not base_url:
             print("错误: 未配置 Cloudflare Temp Email Base URL")
-            print(" 请在 config.json 或环境变量中设置 mail_base_url / MAIL_BASE_URL")
             sys.exit(1)
 
         service = CloudflareTempEmailAdapter(
@@ -187,19 +156,17 @@ def create_email_service(
         service.service_type = EmailServiceType.CLOUDFLARE_TEMP_EMAIL
         return service
 
-    from chatgpt_register_v2.lib.skymail_client import SkymailClient
+    # 默认使用 Skymail
     admin_email = config.get("skymail_admin_email", "")
     admin_password = config.get("skymail_admin_password", "")
     domains = config.get("skymail_domains", None)
 
     if not admin_email or not admin_password:
         print("错误: 未配置 Skymail 管理员账号")
-        print(" 请在 config.json 中设置 skymail_admin_email 和 skymail_admin_password")
         sys.exit(1)
 
     if not domains or not isinstance(domains, list) or len(domains) == 0:
         print("错误: 未配置 skymail_domains")
-        print(' 请在 config.json 中设置域名列表，例如: "skymail_domains": ["admin.example.com"]')
         sys.exit(1)
 
     service = SkymailClient(admin_email, admin_password, proxy=normalized_proxy, domains=domains)
