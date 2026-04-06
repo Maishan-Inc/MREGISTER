@@ -44,6 +44,7 @@ http://127.0.0.1:3000
 - Windows 默认优先使用 `Edge`
 - Linux / Docker 默认使用 `/usr/bin/chromium`
 - 也可以手动设置 `MREGISTER_BROWSER_PATH`
+- 可通过 `MREGISTER_BROWSER_MODE=headless|headed` 切换浏览器模式
 
 ## 远程 Docker Compose
 

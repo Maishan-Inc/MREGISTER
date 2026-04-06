@@ -14,6 +14,45 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function previewText(value, maxLength = 280) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) {
+    return '';
+  }
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
+function classifyBlock(snapshot = {}, pageDiagnostics = {}) {
+  const status = Number(snapshot?.status || 0);
+  const parts = [
+    snapshot?.url,
+    snapshot?.text,
+    snapshot?.errorMessage,
+    snapshot?.headers?.server,
+    snapshot?.headers?.location,
+    pageDiagnostics?.url,
+    pageDiagnostics?.title,
+    pageDiagnostics?.bodyPreview,
+  ].filter(Boolean).join('\n').toLowerCase();
+
+  if (/cloudflare|cf-ray|attention required|just a moment|challenge-platform|cdn-cgi/.test(parts)) {
+    return '疑似 Cloudflare / Challenge 页面';
+  }
+  if (/captcha|verify you are human|human verification|turnstile/.test(parts)) {
+    return '疑似人机验证页面';
+  }
+  if (/access denied|forbidden|request blocked|unable to access|denied/.test(parts) || status === 403) {
+    return '疑似被 OpenAI 边缘层直接拒绝';
+  }
+  if (/unsupported browser|enable javascript|enable cookies/.test(parts)) {
+    return '疑似浏览器环境 / Cookie / JS 校验未通过';
+  }
+  if (/timed out|timeout|network|socket|tls|ssl|disconnected/.test(parts) || status === 0) {
+    return '疑似网络 / TLS / 连接层异常';
+  }
+  return '原因未明，需结合页面内容继续判断';
+}
+
 function emit(event, payload = {}) {
   process.stdout.write(`__RESULT__ ${JSON.stringify({ event, ...payload })}\n`);
 }
@@ -51,7 +90,17 @@ function parseArgs(argv) {
   return args;
 }
 
+function resolveBrowserMode() {
+  const raw = String(process.env.MREGISTER_BROWSER_MODE || 'headless').trim().toLowerCase();
+  return raw === 'headed' ? 'headed' : 'headless';
+}
+
+function isHeadlessMode(browserMode) {
+  return browserMode !== 'headed';
+}
+
 async function launchBrowser() {
+  const browserMode = resolveBrowserMode();
   const attempts = [];
   const envPath = String(process.env.MREGISTER_BROWSER_PATH || '').trim();
   const envChannel = String(process.env.MREGISTER_BROWSER_CHANNEL || '').trim();
@@ -86,7 +135,7 @@ async function launchBrowser() {
     seen.add(key);
     try {
       return await chromium.launch({
-        headless: true,
+        headless: isHeadlessMode(browserMode),
         ...candidate,
         args: baseArgs,
       });
@@ -110,6 +159,84 @@ async function createPage() {
   return { browser, context, page };
 }
 
+async function collectPageDiagnostics(page) {
+  try {
+    const [title, url, content] = await Promise.all([
+      page.title().catch(() => ''),
+      Promise.resolve(page.url()).catch(() => ''),
+      page.content().catch(() => ''),
+    ]);
+    const bodyPreview = previewText(
+      String(content || '')
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/gi, ' '),
+      360,
+    );
+    const cookies = await page.context().cookies().catch(() => []);
+    return {
+      url,
+      title: previewText(title, 120),
+      bodyPreview,
+      cookieNames: cookies.map((item) => item.name).slice(0, 20),
+    };
+  } catch (error) {
+    return {
+      url: '',
+      title: '',
+      bodyPreview: '',
+      cookieNames: [],
+      errorMessage: error.message,
+    };
+  }
+}
+
+function attachRegistrationDiagnostics(chatgptClient) {
+  const originalFetch = chatgptClient._fetch.bind(chatgptClient);
+  chatgptClient._fetch = async (url, options = {}) => {
+    const result = await originalFetch(url, options);
+    if (String(url).includes('/api/auth/csrf')) {
+      chatgptClient.__lastCsrfSnapshot = {
+        status: result?.status || 0,
+        url: result?.url || url,
+        headers: result?.headers || {},
+        text: previewText(result?.text || '', 320),
+        errorMessage: result?.errorMessage || '',
+      };
+    }
+    return result;
+  };
+}
+
+async function logRegistrationDiagnostics(chatgptClient, runtime, failureMessage) {
+  const pageDiagnostics = await collectPageDiagnostics(runtime.page);
+  const csrfSnapshot = chatgptClient.__lastCsrfSnapshot || {};
+  const classification = classifyBlock(csrfSnapshot, pageDiagnostics);
+
+  log(`[Diag] Register entry failure: ${failureMessage}`);
+  log(`[Diag] Classification: ${classification}`);
+  if (csrfSnapshot.status || csrfSnapshot.errorMessage || csrfSnapshot.text) {
+    log(
+      `[Diag] CSRF snapshot: status=${csrfSnapshot.status || 0} url=${previewText(csrfSnapshot.url || '-', 180)} ` +
+      `server=${previewText(csrfSnapshot.headers?.server || '-', 60)} content-type=${previewText(csrfSnapshot.headers?.['content-type'] || '-', 80)}`,
+    );
+    if (csrfSnapshot.text) {
+      log(`[Diag] CSRF body: ${csrfSnapshot.text}`);
+    }
+    if (csrfSnapshot.errorMessage) {
+      log(`[Diag] CSRF error: ${csrfSnapshot.errorMessage}`);
+    }
+  }
+  log(
+    `[Diag] Page snapshot: url=${previewText(pageDiagnostics.url || '-', 180)} title=${previewText(pageDiagnostics.title || '-', 120)} ` +
+    `cookies=${pageDiagnostics.cookieNames.join(',') || '-'}`,
+  );
+  if (pageDiagnostics.bodyPreview) {
+    log(`[Diag] Page body: ${pageDiagnostics.bodyPreview}`);
+  }
+}
+
 function saveAccountArtifacts(outputDir, index, payload) {
   const folderName = `${String(index).padStart(3, '0')}-${safeSegment(payload.email)}`;
   const accountDir = path.join(outputDir, folderName);
@@ -122,6 +249,7 @@ function saveAccountArtifacts(outputDir, index, payload) {
 
 async function registerOne(index, total, config, mailbox, results) {
   const { output_dir: outputDir } = config;
+  const browserMode = resolveBrowserMode();
   const picked = await mailbox.acquireAccount();
   const email = picked.email;
   const account = picked.account || {};
@@ -135,9 +263,10 @@ async function registerOne(index, total, config, mailbox, results) {
   try {
     const chatgptClient = new ChatGPTClient(runtime.page, {
       verbose: true,
-      browserMode: 'headless',
+      browserMode,
       fetchTimeoutMs: 30000,
     });
+    attachRegistrationDiagnostics(chatgptClient);
 
     const [registerOk, registerMessage] = await chatgptClient.registerCompleteFlow(
       email,
@@ -154,6 +283,7 @@ async function registerOne(index, total, config, mailbox, results) {
     );
 
     if (!registerOk) {
+      await logRegistrationDiagnostics(chatgptClient, runtime, String(registerMessage || 'register flow failed'));
       throw new Error(`register flow failed: ${registerMessage}`);
     }
 
@@ -161,7 +291,7 @@ async function registerOne(index, total, config, mailbox, results) {
 
     const oauthClient = new OAuthClient(runtime.page, {
       verbose: true,
-      browserMode: 'headless',
+      browserMode,
       otpWaitTimeout: 600,
       otpResendWaitTimeout: 300,
     });
@@ -244,6 +374,7 @@ async function main() {
   log(`Task ID: ${config.task_id}`);
   log(`Target quantity: ${quantity}`);
   log(`Driver source: ${path.resolve(process.cwd(), 'driver-lib')}`);
+  log(`Browser mode: ${resolveBrowserMode()}`);
   log(`Mail category: ${config.credential?.category_key || 'mregister'}`);
   log(`Success tag: ${config.credential?.tag_key || 'chatgpt_registered'}`);
   log('============================================================');
