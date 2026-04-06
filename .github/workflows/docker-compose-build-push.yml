@@ -41,7 +41,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: web_console/Dockerfile
+          file: Dockerfile
           push: true  # 推送镜像到 Docker Hub
           tags: ${{ steps.meta.outputs.tags }}  # 使用步骤 4 生成的标签
           labels: ${{ steps.meta.outputs.labels }}  # 附加元数据标签
