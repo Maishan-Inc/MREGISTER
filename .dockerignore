@@ -1,11 +1,5 @@
-.git
-.github
-.alma-snapshots
-__pycache__
-**/__pycache__
-**/*.pyc
-**/*.pyo
-**/*.pyd
-**/.DS_Store
-web_console/node_modules
-web_console/runtime
+node_modules
+.next
+runtime
+历史版本
+*.log

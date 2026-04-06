@@ -1,5 +1,8 @@
-.alma-snapshots
-web_console/node_modules/
-web_console/runtime/
-__pycache__/
-/参考文件/
+node_modules
+.next
+runtime
+dist
+__pycache__
+*.pyc
+.env
+*.log

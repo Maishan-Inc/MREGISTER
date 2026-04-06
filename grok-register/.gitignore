@@ -1,5 +1,0 @@
-.alma-snapshots
-.env
-__pycache__
-keys/*
-*.pyc

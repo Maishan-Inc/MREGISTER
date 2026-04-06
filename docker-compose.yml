@@ -1,12 +1,9 @@
 services:
-  register-console:
+  mregister:
     image: maishanhub/mregister:main
     container_name: mregister
     ports:
-      - "8000:8000"
-    environment:
-      WEB_CONSOLE_MAX_CONCURRENT_TASKS: "2"
-      WEB_CONSOLE_POLL_INTERVAL: "1.0"
+      - "3000:3000"
     volumes:
-      - ./web_console/runtime:/app/web_console/runtime
+      - ./runtime:/app/runtime
     restart: unless-stopped
