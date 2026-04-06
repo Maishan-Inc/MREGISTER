@@ -5,13 +5,6 @@ import { spawn } from "node:child_process";
 import { getTask, incrementTaskResult, updateTaskStatus } from "@/src/server/tasks";
 import { nowIso } from "@/src/server/db";
 
-function resolvePythonCommand() {
-  if (process.env.MREGISTER_PYTHON_BIN) {
-    return process.env.MREGISTER_PYTHON_BIN;
-  }
-  return process.platform === "win32" ? "python" : "python3";
-}
-
 class TaskRunner {
   constructor() {
     this.processes = new Map();
@@ -26,14 +19,14 @@ class TaskRunner {
     const configPath = path.join(taskDir, "task.json");
     const output = fs.createWriteStream(task.console_path, { flags: "a" });
     output.write(`[${nowIso()}] Task queued\n`);
-    const pythonBin = resolvePythonCommand();
-    const workerPath = path.join(process.cwd(), "worker", "register_task.py");
-    output.write(`[${nowIso()}] Launching worker with ${pythonBin} ${workerPath}\n`);
+    const nodeBin = process.execPath;
+    const workerPath = path.join(process.cwd(), "worker", "register-task.cjs");
+    output.write(`[${nowIso()}] Launching worker with ${nodeBin} ${workerPath}\n`);
 
-    const child = spawn(pythonBin, [workerPath, "--config", configPath], {
+    const child = spawn(nodeBin, [workerPath, "--config", configPath], {
       cwd: process.cwd(),
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, PYTHONUTF8: "1" },
+      env: { ...process.env },
     });
     this.processes.set(taskId, { child, output });
     updateTaskStatus(taskId, "running", { pid: child.pid, error_message: null });

@@ -491,7 +491,7 @@ export function ConsoleApp() {
     return (
       <section className="section-card active">
         <article className="panel docs-panel">
-          <section className="docs-hero"><h3>部署、初始化与使用流程</h3><p>新版本采用 Next.js + React + SQLite，本地任务由 Python lib 驱动执行，Docker Compose 默认走远程镜像部署。</p></section>
+          <section className="docs-hero"><h3>部署、初始化与使用流程</h3><p>新版本采用 Next.js + React + SQLite，本地任务由 Node.js 接入指定 lib 驱动执行，Docker Compose 默认走远程镜像部署。</p></section>
           <section className="doc-card doc-feature">
             <div>
               <h3>新邮件系统</h3>
@@ -505,8 +505,8 @@ export function ConsoleApp() {
             <div className="doc-media-frame"><img className="doc-media" src="/docs-log-preview.jpg" alt="MREGISTER preview" /></div>
           </section>
           <div className="docs-grid">
-            <section className="doc-card"><h3>本地安装</h3><ol className="doc-step-list"><li>`npm install`</li><li>`python -m pip install -r worker/requirements.txt`</li><li>`npm run dev`</li><li>浏览器打开 `http://127.0.0.1:3000`</li></ol></section>
-            <section className="doc-card"><h3>远程 Docker Compose</h3><pre className="doc-pre">{`services:\n  mregister:\n    image: maishanhub/mregister:main\n    container_name: mregister\n    ports:\n      - "3000:3000"\n    volumes:\n      - ./runtime:/app/runtime\n    restart: unless-stopped`}</pre></section>
+            <section className="doc-card"><h3>本地安装</h3><ol className="doc-step-list"><li>`npm install`</li><li>`npm run dev`</li><li>确保本机存在 Edge / Chrome，或设置 `MREGISTER_BROWSER_PATH`</li><li>浏览器打开 `http://127.0.0.1:3000`</li></ol></section>
+            <section className="doc-card"><h3>远程 Docker Compose</h3><pre className="doc-pre">{`services:\n  mregister:\n    image: maishanhub/mregister:main\n    container_name: mregister\n    ports:\n      - "3345:3000"\n    volumes:\n      - ./runtime:/app/runtime\n    restart: unless-stopped`}</pre></section>
           </div>
           <section className="doc-card"><h3>首次初始化</h3><ol className="doc-step-list"><li>阅读协议并设置管理员密码。</li><li>在“凭据”页新增 OutlookManager API 凭据。</li><li>按需设为默认凭据。</li><li>进入“新建任务”创建注册任务。</li><li>在“任务详情”页查看控制台与下载结果。</li></ol></section>
           <div className="docs-grid">

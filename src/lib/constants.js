@@ -4,7 +4,7 @@ export const PLATFORM_SPECS = {
   "chatgpt-register-lib": {
     label: "ChatGPT Register Lib",
     default_concurrency: 1,
-    notes: "使用 Python lib 驱动执行注册，并通过 OutlookManager 接口统一取号和收码。",
+    notes: "使用 Node.js 接入指定 lib 驱动执行注册，并通过 OutlookManager 接口统一取号和收码。",
   },
 };
 

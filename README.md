@@ -1,11 +1,12 @@
 # MREGISTER Next
 
-新版 `MREGISTER` 使用 `Next.js + React + SQLite` 重做控制台，任务执行层仍保留 Python `lib` 驱动，并把邮件系统切换到 OutlookManager API。
+新版 `MREGISTER` 使用 `Next.js + React + SQLite + Node.js` 重做控制台，任务执行层改为接入你指定的 JS `lib` 驱动，并把邮件系统切换到 OutlookManager API。
 
 ## 关键变化
 
 - 后端持久化改为本地 `SQLite`
 - 前端改为 `Next.js` 控制台
+- 注册执行链路改为纯 `Node.js`，不再依赖 Python
 - 邮箱默认从 `mregister` 分类中挑选未打 `chatgpt_registered` 标签的账号
 - 同一轮注册的发码、收码、完成注册都固定使用同一个邮箱
 - 成功后自动为该邮箱打上 `chatgpt_registered` 标签
@@ -14,7 +15,6 @@
 
 ```bash
 npm install
-python -m pip install -r worker/requirements.txt
 npm run dev
 ```
 
@@ -38,6 +38,12 @@ http://127.0.0.1:3000
   默认 `chatgpt_registered`
 
 如果分类或标签不存在，worker 会自动创建。
+
+本地运行任务时需要系统可用浏览器：
+
+- Windows 默认优先使用 `Edge`
+- Linux / Docker 默认使用 `/usr/bin/chromium`
+- 也可以手动设置 `MREGISTER_BROWSER_PATH`
 
 ## 远程 Docker Compose
 
