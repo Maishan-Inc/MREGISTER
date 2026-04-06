@@ -5,6 +5,13 @@ import { spawn } from "node:child_process";
 import { getTask, incrementTaskResult, updateTaskStatus } from "@/src/server/tasks";
 import { nowIso } from "@/src/server/db";
 
+function resolvePythonCommand() {
+  if (process.env.MREGISTER_PYTHON_BIN) {
+    return process.env.MREGISTER_PYTHON_BIN;
+  }
+  return process.platform === "win32" ? "python" : "python3";
+}
+
 class TaskRunner {
   constructor() {
     this.processes = new Map();
@@ -19,7 +26,11 @@ class TaskRunner {
     const configPath = path.join(taskDir, "task.json");
     const output = fs.createWriteStream(task.console_path, { flags: "a" });
     output.write(`[${nowIso()}] Task queued\n`);
-    const child = spawn("python", ["worker/register_task.py", "--config", configPath], {
+    const pythonBin = resolvePythonCommand();
+    const workerPath = path.join(process.cwd(), "worker", "register_task.py");
+    output.write(`[${nowIso()}] Launching worker with ${pythonBin} ${workerPath}\n`);
+
+    const child = spawn(pythonBin, [workerPath, "--config", configPath], {
       cwd: process.cwd(),
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, PYTHONUTF8: "1" },
@@ -41,6 +52,17 @@ class TaskRunner {
 
     readline.createInterface({ input: child.stdout }).on("line", handleLine);
     readline.createInterface({ input: child.stderr }).on("line", handleLine);
+
+    child.on("error", (error) => {
+      output.write(`[${nowIso()}] Worker spawn error: ${error.message}\n`);
+      output.end();
+      this.processes.delete(taskId);
+      updateTaskStatus(taskId, "failed", {
+        error_message: `Worker spawn error: ${error.message}`,
+        completed_at: nowIso(),
+        pid: null,
+      });
+    });
 
     child.on("close", (code, signal) => {
       output.write(`[${nowIso()}] Task exit code=${code} signal=${signal}\n`);

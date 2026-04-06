@@ -42,6 +42,53 @@ function statusText(status) {
   }[status] || status;
 }
 
+function SidebarIcon({ id }) {
+  switch (id) {
+    case "dashboard":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M4 13.5h7V20H4zM13 4h7v9H13zM13 15h7v5H13zM4 4h7v7.5H4z" />
+        </svg>
+      );
+    case "credentials":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 3a5 5 0 0 0-1.2 9.86A7.51 7.51 0 0 0 4 20h2a5.5 5.5 0 0 1 11 0h3a4 4 0 0 0-4-4h-1.2a5 5 0 0 0-2.8-13Z" />
+        </svg>
+      );
+    case "create-task":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M5 4h9l5 5v11H5zM14 4v5h5M12 11v6M9 14h6" />
+        </svg>
+      );
+    case "task-detail":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4" />
+        </svg>
+      );
+    case "api-keys":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M14 7a4 4 0 1 1 3.87 5H16l-2 2h-2l-1 1H8l-2 2H3v-3l6.17-6.17A4 4 0 0 1 14 7Zm3-1.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z" />
+        </svg>
+      );
+    case "docs":
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M6 4h9l3 3v13H6zM15 4v4h4M9 11h6M9 15h6" />
+        </svg>
+      );
+    default:
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="6" />
+        </svg>
+      );
+  }
+}
+
 export function ConsoleApp() {
   const [activeSection, setActiveSection] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -490,14 +537,14 @@ export function ConsoleApp() {
           <div className="sidebar-top"><div className="sidebar-brand"><div className="brand-logo-wrap"><img className="brand-logo" src="/logo.png" alt={APP_NAME} /></div><div className="brand-copy"><h1>{APP_NAME}</h1></div></div></div>
           <nav className="sidebar-nav">
             {NAV_ITEMS.map(([id, label]) => (
-              <button key={id} type="button" className={`nav-btn ${activeSection === id ? "active" : ""}`.trim()} onClick={() => setActiveSection(id)}>
-                <span className="nav-btn__icon">{label.slice(0, 1)}</span>
+              <button key={id} type="button" title={label} className={`nav-btn ${activeSection === id ? "active" : ""}`.trim()} onClick={() => setActiveSection(id)}>
+                <span className="nav-btn__icon"><SidebarIcon id={id} /></span>
                 <span className="nav-btn__label">{label}</span>
               </button>
             ))}
           </nav>
-          <BusyButton type="button" className="sidebar-logout" busy={isBusy("logout")} onClick={handleLogout}><span className="nav-btn__icon">退</span><span className="nav-btn__label">退出登录</span></BusyButton>
-          <div className="sidebar-footer"><button type="button" className="sidebar-footer-toggle" onClick={() => setSidebarCollapsed((value) => !value)}><span className="nav-btn__icon sidebar-toggle-glyph">{sidebarCollapsed ? ">" : "<"}</span><span className="nav-btn__label">收起侧边栏</span></button></div>
+          <BusyButton type="button" title="退出登录" className="sidebar-logout" busy={isBusy("logout")} onClick={handleLogout}><span className="nav-btn__icon">×</span><span className="nav-btn__label">退出登录</span></BusyButton>
+          <div className="sidebar-footer"><button type="button" title="收起侧边栏" className="sidebar-footer-toggle" onClick={() => setSidebarCollapsed((value) => !value)}><span className="nav-btn__icon sidebar-toggle-glyph">{sidebarCollapsed ? ">" : "<"}</span><span className="nav-btn__label">收起侧边栏</span></button></div>
         </aside>
 
         <main className="content-shell">
