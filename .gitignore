@@ -6,3 +6,5 @@ __pycache__
 *.pyc
 .env
 *.log
+__tmp_*
+历史版本/
