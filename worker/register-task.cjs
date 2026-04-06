@@ -192,6 +192,34 @@ async function collectPageDiagnostics(page) {
   }
 }
 
+function pageLooksLikeChallenge(pageDiagnostics = {}) {
+  const text = [
+    pageDiagnostics?.url,
+    pageDiagnostics?.title,
+    pageDiagnostics?.bodyPreview,
+  ].filter(Boolean).join('\n').toLowerCase();
+
+  return /just a moment|enable javascript and cookies to continue|verification successful\. waiting for chatgpt\.com to respond|cloudflare|challenge-platform|cdn-cgi/.test(text);
+}
+
+async function waitForChallengeClearance(page, options = {}) {
+  const timeoutMs = Math.max(5000, Number(options.timeoutMs || 25000));
+  const intervalMs = Math.max(500, Number(options.intervalMs || 1500));
+  const deadline = Date.now() + timeoutMs;
+  let lastDiagnostics = await collectPageDiagnostics(page);
+
+  while (Date.now() < deadline) {
+    if (!pageLooksLikeChallenge(lastDiagnostics)) {
+      return { cleared: true, diagnostics: lastDiagnostics };
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    lastDiagnostics = await collectPageDiagnostics(page);
+  }
+
+  return { cleared: !pageLooksLikeChallenge(lastDiagnostics), diagnostics: lastDiagnostics };
+}
+
 function attachRegistrationDiagnostics(chatgptClient) {
   const originalFetch = chatgptClient._fetch.bind(chatgptClient);
   chatgptClient._fetch = async (url, options = {}) => {
@@ -206,6 +234,36 @@ function attachRegistrationDiagnostics(chatgptClient) {
       };
     }
     return result;
+  };
+}
+
+function attachChallengeWait(chatgptClient, runtime) {
+  const originalVisitHomepage = chatgptClient.visitHomepage.bind(chatgptClient);
+  chatgptClient.visitHomepage = async () => {
+    const ok = await originalVisitHomepage();
+    if (!ok) {
+      return ok;
+    }
+
+    const result = await waitForChallengeClearance(runtime.page, {
+      timeoutMs: Number(process.env.MREGISTER_CF_WAIT_MS || 25000),
+      intervalMs: 1500,
+    });
+
+    if (!result.cleared) {
+      const classification = classifyBlock({}, result.diagnostics);
+      log(`[Diag] Homepage challenge not cleared before csrf request`);
+      log(`[Diag] Classification: ${classification}`);
+      log(
+        `[Diag] Page snapshot: url=${previewText(result.diagnostics.url || '-', 180)} title=${previewText(result.diagnostics.title || '-', 120)} ` +
+        `cookies=${(result.diagnostics.cookieNames || []).join(',') || '-'}`,
+      );
+      if (result.diagnostics.bodyPreview) {
+        log(`[Diag] Page body: ${result.diagnostics.bodyPreview}`);
+      }
+    }
+
+    return ok;
   };
 }
 
@@ -267,6 +325,7 @@ async function registerOne(index, total, config, mailbox, results) {
       fetchTimeoutMs: 30000,
     });
     attachRegistrationDiagnostics(chatgptClient);
+    attachChallengeWait(chatgptClient, runtime);
 
     const [registerOk, registerMessage] = await chatgptClient.registerCompleteFlow(
       email,
